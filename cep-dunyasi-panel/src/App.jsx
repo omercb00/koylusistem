@@ -1628,6 +1628,150 @@ function CreditsPage({ customerCredits, customers, creditForm, setCreditForm, ad
   );
 }
 
+function PurchasesPage({ products, purchaseForm, setPurchaseForm, addPurchase, purchases, selectProductByBarcode, usdRate, usdStatus, loadUsdRate }) {
+  const [filter, setFilter] = useState({ start: "", end: "" });
+  const quantity = Number(purchaseForm.quantity) || 0;
+  const buyPriceUsd = Number(purchaseForm.buyPrice) || 0;
+  const activeUsdRate = Number(purchaseForm.usdRate || usdRate || 0);
+  const totalUsd = quantity * buyPriceUsd;
+  const unitTl = buyPriceUsd * activeUsdRate;
+  const totalTl = totalUsd * activeUsdRate;
+  const filteredPurchases = filterByDate(purchases, filter.start, filter.end);
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-xl font-bold">Yeni Alış Ekle</h3>
+          <button onClick={loadUsdRate} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">
+            Güncel Kuru Çek
+          </button>
+        </div>
+
+        <div className="mt-4 rounded-2xl bg-blue-50 p-4 text-sm font-semibold text-blue-700">
+          {usdStatus}
+        </div>
+
+        <div className="mt-5 grid gap-5 xl:grid-cols-7">
+          <BarcodeInput
+            label="Barkod"
+            value={purchaseForm.barcodeSearch}
+            onChange={(value) => setPurchaseForm({ ...purchaseForm, barcodeSearch: value })}
+            onSubmit={(value) => selectProductByBarcode(value, "purchase")}
+          />
+          <InputSelect label="Ürün seç" value={purchaseForm.productId} onChange={(e) => setPurchaseForm({ ...purchaseForm, productId: e.target.value })} products={products} />
+          <InputBox label="Mal Alım Firması" placeholder="Firma adı" value={purchaseForm.supplier} onChange={(e) => setPurchaseForm({ ...purchaseForm, supplier: e.target.value })} />
+          <InputBox label="Adet" type="number" value={purchaseForm.quantity} onChange={(e) => setPurchaseForm({ ...purchaseForm, quantity: e.target.value })} />
+          <InputBox label="Alış Fiyatı $" type="number" placeholder="Dolar fiyatı" value={purchaseForm.buyPrice} onChange={(e) => setPurchaseForm({ ...purchaseForm, buyPrice: e.target.value, currency: "USD" })} />
+          <InputBox label="USD Kuru" type="number" placeholder="Güncel kur" value={purchaseForm.usdRate || usdRate || ""} onChange={(e) => setPurchaseForm({ ...purchaseForm, usdRate: e.target.value })} />
+          <InputBox label="Tarih" type="date" value={purchaseForm.date} onChange={(e) => setPurchaseForm({ ...purchaseForm, date: e.target.value })} />
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-4">
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-600">Birim Dolar</label>
+            <input readOnly className="w-full rounded-xl border border-slate-300 bg-slate-100 px-4 py-3 font-semibold" value={moneyUSD(buyPriceUsd)} />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-600">Toplam Dolar</label>
+            <input readOnly className="w-full rounded-xl border border-slate-300 bg-slate-100 px-4 py-3 font-semibold" value={moneyUSD(totalUsd)} />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-600">Birim TL Karşılığı</label>
+            <input readOnly className="w-full rounded-xl border border-slate-300 bg-slate-100 px-4 py-3 font-semibold" value={money(unitTl)} />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-600">Toplam TL Karşılığı</label>
+            <input readOnly className="w-full rounded-xl border border-slate-300 bg-slate-100 px-4 py-3 font-semibold" value={money(totalTl)} />
+          </div>
+        </div>
+
+        <div className="mt-5">
+          <InputBox label="Açıklama opsiyonel" placeholder="Açıklama" value={purchaseForm.note} onChange={(e) => setPurchaseForm({ ...purchaseForm, note: e.target.value })} />
+        </div>
+
+        <button onClick={addPurchase} className="mt-6 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-700">Alışı Kaydet</button>
+      </div>
+
+      <DateFilter filter={filter} setFilter={setFilter} />
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-xl font-bold">Alış Listesi</h3>
+          <div className="flex flex-wrap gap-2">
+            <ExportButton
+              filename="alis-listesi.csv"
+              rows={filteredPurchases}
+              columns={[
+                ["Tarih", (r) => formatDate(r.date)],
+                ["Ürün", "productName"],
+                ["Firma", "supplier"],
+                ["Adet", "quantity"],
+                ["Alış Fiyatı USD", "buyPrice"],
+                ["Toplam USD", "total"],
+                ["Alan Kişi", "buyer"],
+                ["Açıklama", "note"],
+              ]}
+            />
+            <PrintButton
+              title="Alış Listesi"
+              rows={filteredPurchases}
+              columns={[
+                ["Tarih", (r) => formatDate(r.date)],
+                ["Ürün", "productName"],
+                ["Firma", "supplier"],
+                ["Adet", "quantity"],
+                ["Alış Fiyatı", (r) => moneyUSD(r.buyPrice)],
+                ["Toplam", (r) => moneyUSD(r.total)],
+                ["Alan Kişi", "buyer"],
+              ]}
+              summary={[
+                { label: "Toplam Alış USD", value: moneyUSD(filteredPurchases.reduce((t, r) => t + r.total, 0)) },
+                { label: "Güncel TL Karşılığı", value: money(filteredPurchases.reduce((t, r) => t + r.total, 0) * activeUsdRate) },
+                { label: "Kayıt Sayısı", value: filteredPurchases.length },
+              ]}
+            />
+          </div>
+        </div>
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full min-w-[1050px] text-left">
+            <thead>
+              <tr className="border-b text-sm text-slate-500">
+                <th className="py-3">Tarih</th>
+                <th>Ürün</th>
+                <th>Firma</th>
+                <th>Barkod</th>
+                <th>Adet</th>
+                <th>Alış $</th>
+                <th>Toplam $</th>
+                <th>Güncel TL</th>
+                <th>Alan Kişi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredPurchases.map((p) => (
+                <tr key={p.id} className="border-b">
+                  <td className="py-4">{formatDate(p.date)}</td>
+                  <td>{p.productName}</td>
+                  <td>{p.supplier}</td>
+                  <td>{p.barcode || "-"}</td>
+                  <td>{p.quantity}</td>
+                  <td>{moneyUSD(p.buyPrice)}</td>
+                  <td>{moneyUSD(p.total)}</td>
+                  <td>{money(p.total * activeUsdRate)}</td>
+                  <td>{p.buyer}</td>
+                </tr>
+              ))}
+              {filteredPurchases.length === 0 && <tr><td className="py-5 text-slate-400" colSpan="9">Bu tarih aralığında alış yok.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function DebtsPage({
   supplierDebts,
   suppliers,
