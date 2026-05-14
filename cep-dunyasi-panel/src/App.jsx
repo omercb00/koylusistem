@@ -2793,3 +2793,139 @@ function filterByDate(items, start, end) {
 }
 
 export default App;
+
+function SalesPage({ products, saleForm, setSaleForm, addSale, sales, deleteSale, selectProductByBarcode }) {
+  const [filter, setFilter] = useState({ start: "", end: "" });
+  const quantity = Number(saleForm.quantity) || 0;
+  const price = Number(saleForm.price) || 0;
+  const total = price * quantity;
+  const filteredSales = filterByDate(sales, filter.start, filter.end);
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <h3 className="text-xl font-bold">Yeni Satış Ekle</h3>
+
+        <div className="mt-5 grid gap-5 xl:grid-cols-7">
+          <BarcodeInput
+            label="Barkod"
+            value={saleForm.barcodeSearch}
+            onChange={(value) => setSaleForm({ ...saleForm, barcodeSearch: value })}
+            onSubmit={(value) => selectProductByBarcode(value, "sale")}
+          />
+          <InputSelect label="Ürün seç" value={saleForm.productId} onChange={(e) => setSaleForm({ ...saleForm, productId: e.target.value })} products={products} />
+          <InputBox label="Adet" type="number" value={saleForm.quantity} onChange={(e) => setSaleForm({ ...saleForm, quantity: e.target.value })} />
+          <InputBox label="Fiyat ₺" type="number" placeholder="Satış fiyatı" value={saleForm.price} onChange={(e) => setSaleForm({ ...saleForm, price: e.target.value })} />
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-600">Ödeme Türü</label>
+            <select className="w-full rounded-xl border border-slate-300 px-4 py-3" value={saleForm.paymentType} onChange={(e) => setSaleForm({ ...saleForm, paymentType: e.target.value })}>
+              <option>Nakit</option>
+              <option>Kart</option>
+              <option>Veresiye</option>
+            </select>
+          </div>
+
+          <InputBox label="Tarih" type="date" value={saleForm.date} onChange={(e) => setSaleForm({ ...saleForm, date: e.target.value })} />
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-600">Toplam ₺</label>
+            <input readOnly className="w-full rounded-xl border border-slate-300 bg-slate-100 px-4 py-3 font-semibold" value={money(total)} />
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-5 xl:grid-cols-2">
+          <InputBox label="Müşteri adı opsiyonel" placeholder="Müşteri adı" value={saleForm.customer} onChange={(e) => setSaleForm({ ...saleForm, customer: e.target.value })} />
+          <InputBox label="Açıklama opsiyonel" placeholder="Açıklama" value={saleForm.note} onChange={(e) => setSaleForm({ ...saleForm, note: e.target.value })} />
+        </div>
+
+        <button onClick={addSale} className="mt-6 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-700">Satışı Kaydet</button>
+      </div>
+
+      <DateFilter filter={filter} setFilter={setFilter} />
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-xl font-bold">Satış Listesi</h3>
+          <div className="flex flex-wrap gap-2">
+            <ExportButton
+              filename="satis-listesi.csv"
+              rows={filteredSales}
+              columns={[
+                ["Tarih", (r) => formatDate(r.date)],
+                ["Ürün", "productName"],
+                ["Firma", (r) => r.supplier || "Belirtilmedi"],
+                ["Adet", "quantity"],
+                ["Birim Fiyat", "unitPrice"],
+                ["Ödeme", "paymentType"],
+                ["Toplam", "total"],
+                ["Kâr", "profit"],
+                ["Müşteri", "customer"],
+                ["Açıklama", "note"],
+                ["Satan", "seller"],
+              ]}
+            />
+            <PrintButton
+              title="Satış Listesi"
+              rows={filteredSales}
+              columns={[
+                ["Tarih", (r) => formatDate(r.date)],
+                ["Ürün", "productName"],
+                ["Ödeme", "paymentType"],
+                ["Adet", "quantity"],
+                ["Fiyat", (r) => money(r.unitPrice)],
+                ["Toplam", (r) => money(r.total)],
+                ["Kâr", (r) => money(r.profit)],
+                ["Müşteri", "customer"],
+              ]}
+              summary={[
+                { label: "Toplam Satış", value: money(filteredSales.reduce((t, r) => t + r.total, 0)) },
+                { label: "Toplam Kâr", value: money(filteredSales.reduce((t, r) => t + r.profit, 0)) },
+                { label: "Kayıt Sayısı", value: filteredSales.length },
+              ]}
+            />
+          </div>
+        </div>
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full min-w-[1100px] text-left">
+            <thead>
+              <tr className="border-b text-sm text-slate-500">
+                <th className="py-3">Tarih</th>
+                <th>Ürün</th>
+                <th>Firma</th>
+                <th>Barkod</th>
+                <th>Adet</th>
+                <th>Fiyat</th>
+                <th>Ödeme</th>
+                <th>Toplam</th>
+                <th>Kâr</th>
+                <th>Müşteri</th>
+                <th>Fiş</th>
+                <th>İşlem</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredSales.map((s) => (
+                <tr key={s.id} className="border-b">
+                  <td className="py-4">{formatDate(s.date)}</td>
+                  <td>{s.productName}</td>
+                  <td>{s.supplier || "Belirtilmedi"}</td>
+                  <td>{s.barcode || "-"}</td>
+                  <td>{s.quantity}</td>
+                  <td>{money(s.unitPrice)}</td>
+                  <td>{s.paymentType}</td>
+                  <td>{money(s.total)}</td>
+                  <td className="font-semibold text-green-600">{money(s.profit)}</td>
+                  <td>{s.customer}</td>
+                  <td><ReceiptButton sale={s} /></td>
+                  <td><button onClick={() => deleteSale(s.id)} className="rounded-lg bg-red-50 px-3 py-2 text-red-600 hover:bg-red-100">Sil</button></td>
+                </tr>
+              ))}
+              {filteredSales.length === 0 && <tr><td className="py-5 text-slate-400" colSpan="12">Bu tarih aralığında satış yok.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
