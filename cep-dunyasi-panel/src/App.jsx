@@ -2197,6 +2197,7 @@ function ProductsPage({ products, setProducts, cloudStatus, setCloudStatus, usdR
     stock: "",
     buyPrice: "",
     sellPrice: "",
+    imageUrl: "",
   });
 
   const totalStockUsd = products.reduce((t, p) => t + Number(p.stock || 0) * Number(p.buyPrice || 0), 0);
@@ -2232,6 +2233,7 @@ function ProductsPage({ products, setProducts, cloudStatus, setCloudStatus, usdR
           stock: Number(newProduct.stock),
           buy_price: Number(newProduct.buyPrice),
           sell_price: Number(newProduct.sellPrice),
+          image_url: newProduct.imageUrl || "",
         })
         .select()
         .single();
@@ -2249,6 +2251,7 @@ function ProductsPage({ products, setProducts, cloudStatus, setCloudStatus, usdR
         stock: "",
         buyPrice: "",
         sellPrice: "",
+        imageUrl: "",
       });
 
       showToast("Ürün buluta kaydedildi");
@@ -2265,7 +2268,7 @@ function ProductsPage({ products, setProducts, cloudStatus, setCloudStatus, usdR
         ? {
             ...p,
             [field]:
-              field === "name" || field === "supplier" || field === "barcode"
+              field === "name" || field === "supplier" || field === "barcode" || field === "imageUrl" || field === "imageUrl"
                 ? value
                 : Number(value),
           }
@@ -2281,6 +2284,7 @@ function ProductsPage({ products, setProducts, cloudStatus, setCloudStatus, usdR
       stock: "stock",
       buyPrice: "buy_price",
       sellPrice: "sell_price",
+      imageUrl: "image_url",
     };
 
     const dbValue =
@@ -2356,6 +2360,7 @@ function ProductsPage({ products, setProducts, cloudStatus, setCloudStatus, usdR
           <InputBox label="Stok" type="number" value={newProduct.stock} onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })} />
           <InputBox label="Alış fiyatı $" type="number" value={newProduct.buyPrice} onChange={(e) => setNewProduct({ ...newProduct, buyPrice: e.target.value })} />
           <InputBox label="Satış fiyatı ₺" type="number" value={newProduct.sellPrice} onChange={(e) => setNewProduct({ ...newProduct, sellPrice: e.target.value })} />
+          <InputBox label="Ürün görsel linki" value={newProduct.imageUrl} placeholder="https://..." onChange={(e) => setNewProduct({ ...newProduct, imageUrl: e.target.value })} />
         </div>
         <button onClick={addProduct} className="mt-5 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-700">Ürün Ekle</button>
       </div>
@@ -2375,6 +2380,7 @@ function ProductsPage({ products, setProducts, cloudStatus, setCloudStatus, usdR
               ["Stok Toplamı USD", (r) => Number(r.stock || 0) * Number(r.buyPrice || 0)],
               ["Güncel TL Karşılığı", (r) => Number(r.stock || 0) * Number(r.buyPrice || 0) * Number(usdRate || 0)],
               ["Satış Fiyatı TL", "sellPrice"],
+              ["Görsel", (r) => r.imageUrl || ""],
             ]}
           />
         </div>
@@ -2391,6 +2397,7 @@ function ProductsPage({ products, setProducts, cloudStatus, setCloudStatus, usdR
                 <th>Güncel TL</th>
                 <th>Satış ₺</th>
                 <th>Birim Kâr ₺</th>
+                <th>Görsel Link</th>
                 <th>İşlem</th>
               </tr>
             </thead>
@@ -2403,7 +2410,14 @@ function ProductsPage({ products, setProducts, cloudStatus, setCloudStatus, usdR
 
                 return (
                   <tr key={p.id} className="border-b">
-                    <td className="py-3"><input className="w-40 rounded-lg border border-slate-300 px-3 py-2" value={p.barcode || ""} onChange={(e) => updateProduct(p.id, "barcode", e.target.value)} /></td>
+                    <td className="py-3">
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.name} className="h-14 w-14 rounded-xl object-cover" />
+                      ) : (
+                        <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">Yok</div>
+                      )}
+                    </td>
+                    <td><input className="w-40 rounded-lg border border-slate-300 px-3 py-2" value={p.barcode || ""} onChange={(e) => updateProduct(p.id, "barcode", e.target.value)} /></td>
                     <td><input className="w-full rounded-lg border border-slate-300 px-3 py-2" value={p.name} onChange={(e) => updateProduct(p.id, "name", e.target.value)} /></td>
                     <td><input className="w-44 rounded-lg border border-slate-300 px-3 py-2" value={p.supplier || ""} onChange={(e) => updateProduct(p.id, "supplier", e.target.value)} /></td>
                     <td><input type="number" className="w-24 rounded-lg border border-slate-300 px-3 py-2" value={p.stock} onChange={(e) => updateProduct(p.id, "stock", e.target.value)} /></td>
@@ -2412,11 +2426,12 @@ function ProductsPage({ products, setProducts, cloudStatus, setCloudStatus, usdR
                     <td className="font-semibold text-blue-600">{money(stockTl)}</td>
                     <td><input type="number" className="w-32 rounded-lg border border-slate-300 px-3 py-2" value={p.sellPrice} onChange={(e) => updateProduct(p.id, "sellPrice", e.target.value)} /></td>
                     <td className={`font-semibold ${unitProfitTl >= 0 ? "text-green-600" : "text-red-600"}`}>{money(unitProfitTl)}</td>
+                    <td><input className="w-56 rounded-lg border border-slate-300 px-3 py-2" value={p.imageUrl || ""} placeholder="Görsel linki" onChange={(e) => updateProduct(p.id, "imageUrl", e.target.value)} /></td>
                     <td><button onClick={() => deleteProduct(p.id)} className="rounded-lg bg-red-50 px-3 py-2 text-red-600 hover:bg-red-100">Sil</button></td>
                   </tr>
                 );
               })}
-              {products.length === 0 && <tr><td colSpan="10" className="py-5 text-slate-400">Henüz ürün yok.</td></tr>}
+              {products.length === 0 && <tr><td colSpan="12" className="py-5 text-slate-400">Henüz ürün yok.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -3062,17 +3077,13 @@ function ReceiptButton({ sale }) {
             .row strong { font-size: 14px; text-align: right; }
             .total { font-size: 18px; font-weight: 900; background: #f1f5f9; padding: 10px; border-radius: 12px; }
             .footer { text-align: center; color: #64748b; font-size: 12px; margin-top: 16px; line-height: 1.4; }
-            @media print {
-              body { padding: 0; }
-              .receipt { border: none; }
-            }
+            .legal { margin-top: 12px; font-size: 10px; color: #94a3b8; text-align: center; }
+            @media print { body { padding: 0; } .receipt { border: none; } }
           </style>
         </head>
         <body>
           <div class="receipt">
-            <div class="logoBox">
-              <div class="logo">SAR</div>
-            </div>
+            <div class="logoBox"><div class="logo">SAR</div></div>
             <h1>SAR ELEKTRONİK</h1>
             <div class="brand">CEP DÜNYASI</div>
             <div class="sub">
@@ -3082,7 +3093,7 @@ function ReceiptButton({ sale }) {
             </div>
 
             <div class="line"></div>
-            <div class="row"><span>Fiş Türü</span><strong>Satış Fişi</strong></div>
+            <div class="row"><span>Fiş No</span><strong>${sale.id}</strong></div>
             <div class="row"><span>Tarih</span><strong>${formatDate(sale.date)}</strong></div>
             <div class="row"><span>Ürün</span><strong>${sale.productName || ""}</strong></div>
             <div class="row"><span>Barkod</span><strong>${sale.barcode || "-"}</strong></div>
@@ -3099,13 +3110,9 @@ function ReceiptButton({ sale }) {
               Bizi tercih ettiğiniz için teşekkür ederiz.<br />
               CEP DÜNYASI
             </div>
+            <div class="legal">Bu belge bilgi amaçlı satış fişidir.</div>
           </div>
-
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
+          <script>window.onload = function(){ window.print(); };</script>
         </body>
       </html>
     `;
@@ -3124,7 +3131,6 @@ function ReceiptButton({ sale }) {
     </button>
   );
 }
-
 
 function CorporateReportButton({ title, rows, columns, summary = [], filename = "rapor" }) {
   const openReport = () => {
@@ -3536,6 +3542,7 @@ function mapProductFromDb(row) {
     stock: Number(row.stock || 0),
     buyPrice: Number(row.buy_price || 0),
     sellPrice: Number(row.sell_price || 0),
+    imageUrl: row.image_url || "",
   };
 }
 
