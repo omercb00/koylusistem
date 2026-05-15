@@ -69,6 +69,23 @@ function App() {
     }
   }, [currentUser, isLoggedIn]);
 
+  // Aktif sayfa yetki kontrolü
+  useEffect(() => {
+    if (!currentUser) return;
+    const permissions = {
+      "Yönetici": ["dashboard", "sales", "purchases", "cash", "closing", "credits", "debts", "products", "expenses", "users", "reports"],
+      "Satış": ["dashboard", "sales", "cash", "credits", "products", "reports"],
+      "Kasa": ["dashboard", "sales", "cash", "credits", "expenses", "reports"],
+      "Stok": ["dashboard", "purchases", "debts", "products", "reports"],
+    };
+    const allowed = permissions[currentUser.role] || [];
+    if (!allowed.includes(activePage)) {
+      setActivePage("dashboard");
+      localStorage.setItem("cepDunyasiActivePage", "dashboard");
+    }
+  }, [currentUser, activePage]);
+
+
   const [cloudStatus, setCloudStatus] = useState("Bulut hazır");
   const [toast, setToast] = useState(null);
   const [usdRate, setUsdRate] = useState(0);
@@ -992,6 +1009,26 @@ function App() {
 
   const isAdmin = currentUser?.role === "Yönetici";
 
+  const rolePermissions = {
+    "Yönetici": ["dashboard", "sales", "purchases", "cash", "closing", "credits", "debts", "products", "expenses", "users", "reports"],
+    "Satış": ["dashboard", "sales", "cash", "credits", "products", "reports"],
+    "Kasa": ["dashboard", "sales", "cash", "credits", "expenses", "reports"],
+    "Stok": ["dashboard", "purchases", "debts", "products", "reports"],
+  };
+
+  const canOpenPage = (page) => {
+    if (!currentUser) return false;
+    return rolePermissions[currentUser.role]?.includes(page) || false;
+  };
+
+  const openSafePage = (page) => {
+    if (!canOpenPage(page)) {
+      showToast("Bu sayfa için yetkin yok", "error");
+      return;
+    }
+    changePage(page);
+  };
+
   if (!currentUser) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
@@ -1049,17 +1086,17 @@ function App() {
         </div>
 
         <nav className="h-[calc(100vh-105px)] space-y-2 overflow-y-auto p-4">
-          <MenuItem icon={<Home size={20} />} text="Ana Panel" active={activePage === "dashboard"} onClick={() => changePage("dashboard")} />
-          <MenuItem icon={<ShoppingCart size={20} />} text="Satış İşlemleri" active={activePage === "sales"} onClick={() => changePage("sales")} />
-          <MenuItem icon={<PackagePlus size={20} />} text="Alış İşlemleri" active={activePage === "purchases"} onClick={() => changePage("purchases")} />
-          <MenuItem icon={<Wallet size={20} />} text="Kasa Yönetimi" active={activePage === "cash"} onClick={() => changePage("cash")} />
-          <MenuItem icon={<BarChart3 size={20} />} text="Günlük Devir" active={activePage === "closing"} onClick={() => changePage("closing")} />
-          <MenuItem icon={<ReceiptText size={20} />} text="Veresiye / Alacak" active={activePage === "credits"} onClick={() => changePage("credits")} />
-          <MenuItem icon={<ReceiptText size={20} />} text="Cari / Firma Borçları" active={activePage === "debts"} onClick={() => changePage("debts")} />
-          <MenuItem icon={<Boxes size={20} />} text="Stok / Ürünler" active={activePage === "products"} onClick={() => changePage("products")} />
-          <MenuItem icon={<ReceiptText size={20} />} text="Giderler" active={activePage === "expenses"} onClick={() => changePage("expenses")} />
-          <MenuItem icon={<BarChart3 size={20} />} text="Raporlar & Grafikler" active={activePage === "reports"} onClick={() => changePage("reports")} />
-          {isAdmin && <MenuItem icon={<Users size={20} />} text="Kullanıcı Yönetimi" active={activePage === "users"} onClick={() => changePage("users")} />}
+          <MenuItem icon={<Home size={20} />} text="Ana Panel" active={activePage === "dashboard"} onClick={() => openSafePage("dashboard")} />
+          <MenuItem icon={<ShoppingCart size={20} />} text="Satış İşlemleri" active={activePage === "sales"} onClick={() => openSafePage("sales")} />
+          <MenuItem icon={<PackagePlus size={20} />} text="Alış İşlemleri" active={activePage === "purchases"} onClick={() => openSafePage("purchases")} />
+          <MenuItem icon={<Wallet size={20} />} text="Kasa Yönetimi" active={activePage === "cash"} onClick={() => openSafePage("cash")} />
+          <MenuItem icon={<BarChart3 size={20} />} text="Günlük Devir" active={activePage === "closing"} onClick={() => openSafePage("closing")} />
+          <MenuItem icon={<ReceiptText size={20} />} text="Veresiye / Alacak" active={activePage === "credits"} onClick={() => openSafePage("credits")} />
+          <MenuItem icon={<ReceiptText size={20} />} text="Cari / Firma Borçları" active={activePage === "debts"} onClick={() => openSafePage("debts")} />
+          <MenuItem icon={<Boxes size={20} />} text="Stok / Ürünler" active={activePage === "products"} onClick={() => openSafePage("products")} />
+          <MenuItem icon={<ReceiptText size={20} />} text="Giderler" active={activePage === "expenses"} onClick={() => openSafePage("expenses")} />
+          <MenuItem icon={<BarChart3 size={20} />} text="Raporlar & Grafikler" active={activePage === "reports"} onClick={() => openSafePage("reports")} />
+          {isAdmin && <MenuItem icon={<Users size={20} />} text="Kullanıcı Yönetimi" active={activePage === "users"} onClick={() => openSafePage("users")} />}
         </nav>
       </aside>
 
@@ -1114,16 +1151,16 @@ function App() {
             />
           )}
 
-          {activePage === "sales" && <SalesPage products={products} saleForm={saleForm} setSaleForm={setSaleForm} addSale={addSale} sales={sales} deleteSale={deleteSale} selectProductByBarcode={selectProductByBarcode} />}
-          {activePage === "purchases" && <PurchasesPage products={products} purchaseForm={purchaseForm} setPurchaseForm={setPurchaseForm} addPurchase={addPurchase} purchases={purchases} selectProductByBarcode={selectProductByBarcode} usdRate={usdRate} usdStatus={usdStatus} loadUsdRate={loadUsdRate} />}
-          {activePage === "cash" && <CashPage cashBalance={cashBalance} cardBalance={cardBalance} remainingCredit={remainingCredit} totalCompanyDebt={totalCompanyDebt} sales={sales} debtPayments={debtPayments} creditPayments={creditPayments} expenses={expenses} />}
-          {activePage === "closing" && <DailyClosingPage cashBalance={cashBalance} cardBalance={cardBalance} remainingCredit={remainingCredit} totalCompanyDebt={totalCompanyDebt} dailyClosings={dailyClosings} addDailyClosing={addDailyClosing} />}
-          {activePage === "credits" && <CreditsPage customerCredits={customerCredits} customers={customers} creditForm={creditForm} setCreditForm={setCreditForm} addCreditPayment={addCreditPayment} creditPayments={creditPayments} />}
-          {activePage === "debts" && <DebtsPage supplierDebts={supplierDebts} suppliers={suppliers} debtForm={debtForm} setDebtForm={setDebtForm} addDebtPayment={addDebtPayment} debtPayments={debtPayments} usdRate={usdRate} usdStatus={usdStatus} loadUsdRate={loadUsdRate} />}
-          {activePage === "products" && <ProductsPage products={products} setProducts={setProducts} cloudStatus={cloudStatus} setCloudStatus={setCloudStatus} usdRate={usdRate} usdStatus={usdStatus} loadUsdRate={loadUsdRate} />}
-          {activePage === "expenses" && <ExpensesPage expenseForm={expenseForm} setExpenseForm={setExpenseForm} addExpense={addExpense} deleteExpense={deleteExpense} expenses={expenses} />}
-          {activePage === "users" && isAdmin && <UsersPage users={users} newUser={newUser} setNewUser={setNewUser} addUser={addUser} deleteUser={deleteUser} />}
-          {activePage === "reports" && <ReportsPage sales={sales} purchases={purchases} debtPayments={debtPayments} creditPayments={creditPayments} expenses={expenses} />}
+          {activePage === "sales" && canOpenPage("sales") && <SalesPage products={products} saleForm={saleForm} setSaleForm={setSaleForm} addSale={addSale} sales={sales} deleteSale={deleteSale} selectProductByBarcode={selectProductByBarcode} />}
+          {activePage === "purchases" && canOpenPage("purchases") && <PurchasesPage products={products} purchaseForm={purchaseForm} setPurchaseForm={setPurchaseForm} addPurchase={addPurchase} purchases={purchases} selectProductByBarcode={selectProductByBarcode} usdRate={usdRate} usdStatus={usdStatus} loadUsdRate={loadUsdRate} />}
+          {activePage === "cash" && canOpenPage("cash") && <CashPage cashBalance={cashBalance} cardBalance={cardBalance} remainingCredit={remainingCredit} totalCompanyDebt={totalCompanyDebt} sales={sales} debtPayments={debtPayments} creditPayments={creditPayments} expenses={expenses} />}
+          {activePage === "closing" && canOpenPage("closing") && <DailyClosingPage cashBalance={cashBalance} cardBalance={cardBalance} remainingCredit={remainingCredit} totalCompanyDebt={totalCompanyDebt} dailyClosings={dailyClosings} addDailyClosing={addDailyClosing} />}
+          {activePage === "credits" && canOpenPage("credits") && <CreditsPage customerCredits={customerCredits} customers={customers} creditForm={creditForm} setCreditForm={setCreditForm} addCreditPayment={addCreditPayment} creditPayments={creditPayments} />}
+          {activePage === "debts" && canOpenPage("debts") && <DebtsPage supplierDebts={supplierDebts} suppliers={suppliers} debtForm={debtForm} setDebtForm={setDebtForm} addDebtPayment={addDebtPayment} debtPayments={debtPayments} usdRate={usdRate} usdStatus={usdStatus} loadUsdRate={loadUsdRate} />}
+          {activePage === "products" && canOpenPage("products") && <ProductsPage products={products} setProducts={setProducts} cloudStatus={cloudStatus} setCloudStatus={setCloudStatus} usdRate={usdRate} usdStatus={usdStatus} loadUsdRate={loadUsdRate} />}
+          {activePage === "expenses" && canOpenPage("expenses") && <ExpensesPage expenseForm={expenseForm} setExpenseForm={setExpenseForm} addExpense={addExpense} deleteExpense={deleteExpense} expenses={expenses} />}
+          {activePage === "users" && isAdmin && canOpenPage("users") && <UsersPage users={users} newUser={newUser} setNewUser={setNewUser} addUser={addUser} deleteUser={deleteUser} />}
+          {activePage === "reports" && canOpenPage("reports") && <ReportsPage sales={sales} purchases={purchases} debtPayments={debtPayments} creditPayments={creditPayments} expenses={expenses} />}
         </section>
       </main>
     </div>
@@ -2739,6 +2776,10 @@ function DateFilter({ filter, setFilter }) {
 function UsersPage({ users, newUser, setNewUser, addUser, deleteUser }) {
   return (
     <div className="space-y-6">
+      <div className="rounded-2xl bg-blue-50 p-4 text-sm text-blue-800">
+        <b>Yetki Açıklaması:</b> Yönetici tüm sayfaları görür. Satış: satış, kasa, veresiye ve rapor. Kasa: satış, kasa, gider ve rapor. Stok: alış, firma borç, ürün ve rapor.
+      </div>
+
       <div className="rounded-2xl bg-white p-6 shadow-sm">
         <div className="flex items-center gap-2">
           <UserPlus size={22} className="text-blue-600" />
@@ -2755,6 +2796,7 @@ function UsersPage({ users, newUser, setNewUser, addUser, deleteUser }) {
             <select className="w-full rounded-xl border border-slate-300 px-4 py-3" value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}>
               <option>Yönetici</option>
               <option>Satış</option>
+              <option>Stok</option>
               <option>Kasa</option>
               <option>Görüntüleme</option>
             </select>
