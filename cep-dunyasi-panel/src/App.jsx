@@ -73,7 +73,7 @@ function App() {
   useEffect(() => {
     if (!currentUser) return;
     const permissions = {
-      "Yönetici": ["dashboard", "sales", "purchases", "cash", "closing", "credits", "debts", "products", "expenses", "users", "reports"],
+      "Yönetici": ["dashboard", "sales", "purchases", "cash", "closing", "credits", "debts", "products", "expenses", "users", "reports", "backup"],
       "Satış": ["dashboard", "sales", "cash", "credits", "products", "reports"],
       "Kasa": ["dashboard", "sales", "cash", "credits", "expenses", "reports"],
       "Stok": ["dashboard", "purchases", "debts", "products", "reports"],
@@ -1010,7 +1010,7 @@ function App() {
   const isAdmin = currentUser?.role === "Yönetici";
 
   const rolePermissions = {
-    "Yönetici": ["dashboard", "sales", "purchases", "cash", "closing", "credits", "debts", "products", "expenses", "users", "reports"],
+    "Yönetici": ["dashboard", "sales", "purchases", "cash", "closing", "credits", "debts", "products", "expenses", "users", "reports", "backup"],
     "Satış": ["dashboard", "sales", "cash", "credits", "products", "reports"],
     "Kasa": ["dashboard", "sales", "cash", "credits", "expenses", "reports"],
     "Stok": ["dashboard", "purchases", "debts", "products", "reports"],
@@ -1161,6 +1161,7 @@ function App() {
           {activePage === "expenses" && canOpenPage("expenses") && <ExpensesPage expenseForm={expenseForm} setExpenseForm={setExpenseForm} addExpense={addExpense} deleteExpense={deleteExpense} expenses={expenses} />}
           {activePage === "users" && isAdmin && canOpenPage("users") && <UsersPage users={users} newUser={newUser} setNewUser={setNewUser} addUser={addUser} deleteUser={deleteUser} />}
           {activePage === "reports" && canOpenPage("reports") && <ReportsPage sales={sales} purchases={purchases} debtPayments={debtPayments} creditPayments={creditPayments} expenses={expenses} />}
+          {activePage === "backup" && canOpenPage("backup") && <BackupPage users={users} products={products} sales={sales} purchases={purchases} debtPayments={debtPayments} creditPayments={creditPayments} expenses={expenses} dailyClosings={dailyClosings} />}
         </section>
       </main>
     </div>
@@ -2423,6 +2424,170 @@ function ProductsPage({ products, setProducts, cloudStatus, setCloudStatus, usdR
   );
 }
 
+
+
+function BackupPage({ users, products, sales, purchases, debtPayments, creditPayments, expenses, dailyClosings }) {
+  const [importText, setImportText] = useState("");
+
+  const backupData = {
+    createdAt: new Date().toISOString(),
+    firma: "SAR ELEKTRONİK - CEP DÜNYASI",
+    users,
+    products,
+    sales,
+    purchases,
+    debtPayments,
+    creditPayments,
+    expenses,
+    dailyClosings,
+  };
+
+  const downloadJsonBackup = () => {
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cep-dunyasi-yedek-${todayInput()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadExcelBackup = () => {
+    const rows = [
+      ["BÖLÜM", "TARİH", "AÇIKLAMA", "ADET", "TUTAR", "EK BİLGİ"],
+      ...products.map((p) => ["ÜRÜN", "", p.name, p.stock, p.buyPrice, p.supplier]),
+      ...sales.map((s) => ["SATIŞ", formatDate(s.date), s.productName, s.quantity, s.total, s.paymentType]),
+      ...purchases.map((p) => ["ALIŞ", formatDate(p.date), p.productName, p.quantity, p.total, p.supplier]),
+      ...expenses.map((e) => ["GİDER", formatDate(e.date), e.category, "", e.amount, e.paymentType]),
+      ...debtPayments.map((d) => ["FİRMA ÖDEME", formatDate(d.date), d.supplier, "", d.amount, d.paymentType]),
+      ...creditPayments.map((c) => ["VERESİYE TAHSİLAT", formatDate(c.date), c.customer, "", c.amount, c.paymentType]),
+    ];
+
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(";"))
+      .join("\n");
+
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cep-dunyasi-genel-yedek-${todayInput()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const printFullReport = () => {
+    const html = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Cep Dünyası Genel Yedek Raporu</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; }
+            .header { border-bottom: 2px solid #0f172a; padding-bottom: 14px; margin-bottom: 18px; }
+            h1 { margin: 0; font-size: 26px; }
+            .muted { color: #64748b; font-size: 12px; margin-top: 6px; }
+            .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 18px 0; }
+            .card { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; }
+            .label { font-size: 12px; color: #64748b; }
+            .value { font-size: 20px; font-weight: 900; margin-top: 5px; }
+            table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 14px; }
+            th { background: #0f172a; color: white; text-align: left; padding: 8px; }
+            td { border-bottom: 1px solid #e5e7eb; padding: 7px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>SAR ELEKTRONİK - CEP DÜNYASI</h1>
+            <div class="muted">Genel Sistem Yedek Raporu • ${new Date().toLocaleDateString("tr-TR")}</div>
+          </div>
+          <div class="grid">
+            <div class="card"><div class="label">Ürün</div><div class="value">${products.length}</div></div>
+            <div class="card"><div class="label">Satış</div><div class="value">${sales.length}</div></div>
+            <div class="card"><div class="label">Alış</div><div class="value">${purchases.length}</div></div>
+            <div class="card"><div class="label">Gider</div><div class="value">${expenses.length}</div></div>
+          </div>
+          <table>
+            <thead><tr><th>Bölüm</th><th>Açıklama</th><th>Adet</th><th>Tutar</th></tr></thead>
+            <tbody>
+              ${products.map((p) => `<tr><td>Ürün</td><td>${p.name}</td><td>${p.stock}</td><td>${p.buyPrice}</td></tr>`).join("")}
+              ${sales.map((s) => `<tr><td>Satış</td><td>${s.productName}</td><td>${s.quantity}</td><td>${s.total}</td></tr>`).join("")}
+              ${purchases.map((p) => `<tr><td>Alış</td><td>${p.productName}</td><td>${p.quantity}</td><td>${p.total}</td></tr>`).join("")}
+              ${expenses.map((e) => `<tr><td>Gider</td><td>${e.category}</td><td>-</td><td>${e.amount}</td></tr>`).join("")}
+            </tbody>
+          </table>
+          <script>window.onload = function(){ window.print(); };</script>
+        </body>
+      </html>
+    `;
+    const win = window.open("", "_blank");
+    win.document.write(html);
+    win.document.close();
+  };
+
+  const copyBackup = async () => {
+    await navigator.clipboard.writeText(JSON.stringify(backupData, null, 2));
+    alert("Yedek panoya kopyalandı");
+  };
+
+  const importBackup = () => {
+    if (!confirm("Bu işlem sadece bu cihazdaki yerel önbelleği günceller. Bulut verisini değiştirmez. Devam edilsin mi?")) return;
+
+    try {
+      const data = JSON.parse(importText);
+      if (data.products) localStorage.setItem("cepDunyasiProducts", JSON.stringify(data.products));
+      if (data.sales) localStorage.setItem("cepDunyasiSales", JSON.stringify(data.sales));
+      if (data.purchases) localStorage.setItem("cepDunyasiPurchases", JSON.stringify(data.purchases));
+      if (data.expenses) localStorage.setItem("cepDunyasiExpenses", JSON.stringify(data.expenses));
+      if (data.debtPayments) localStorage.setItem("cepDunyasiDebtPayments", JSON.stringify(data.debtPayments));
+      if (data.creditPayments) localStorage.setItem("cepDunyasiCreditPayments", JSON.stringify(data.creditPayments));
+      if (data.dailyClosings) localStorage.setItem("cepDunyasiDailyClosings", JSON.stringify(data.dailyClosings));
+      alert("Yerel yedek içeri aktarıldı. Sayfa yenilenecek.");
+      window.location.reload();
+    } catch {
+      alert("Yedek dosyası okunamadı");
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl bg-slate-950 p-6 text-white">
+        <h3 className="text-2xl font-black">Yedek / Dışa Aktar</h3>
+        <p className="mt-2 text-sm text-slate-300">Sistemdeki ürün, satış, alış, gider, cari ve günlük devir kayıtlarını dışa aktar.</p>
+      </div>
+
+      <div className="grid gap-5 md:grid-cols-4">
+        <StatCard title="Ürün" value={products.length} desc="Toplam ürün kaydı" />
+        <StatCard title="Satış" value={sales.length} desc="Toplam satış kaydı" />
+        <StatCard title="Alış" value={purchases.length} desc="Toplam alış kaydı" />
+        <StatCard title="Gider" value={expenses.length} desc="Toplam gider kaydı" />
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <h3 className="text-xl font-bold">Yedek Al</h3>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <button onClick={downloadJsonBackup} className="rounded-xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-700">JSON Yedek İndir</button>
+          <button onClick={downloadExcelBackup} className="rounded-xl bg-green-600 px-5 py-3 font-bold text-white hover:bg-green-700">Excel/CSV İndir</button>
+          <button onClick={printFullReport} className="rounded-xl bg-slate-950 px-5 py-3 font-bold text-white hover:bg-slate-800">PDF/Yazdır Raporu</button>
+          <button onClick={copyBackup} className="rounded-xl bg-purple-600 px-5 py-3 font-bold text-white hover:bg-purple-700">Yedeği Kopyala</button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <h3 className="text-xl font-bold">Yerel Yedek İçeri Aktar</h3>
+        <p className="mt-2 text-sm text-slate-500">Bu alan bulutu değiştirmez; sadece cihaz önbelleği için acil geri yükleme amaçlıdır.</p>
+        <textarea
+          className="mt-4 h-48 w-full rounded-2xl border border-slate-300 p-4 outline-none focus:border-blue-600"
+          placeholder="JSON yedeğini buraya yapıştır"
+          value={importText}
+          onChange={(e) => setImportText(e.target.value)}
+        />
+        <button onClick={importBackup} className="mt-4 rounded-xl bg-red-600 px-5 py-3 font-bold text-white hover:bg-red-700">Yerel Yedeği İçeri Aktar</button>
+      </div>
+    </div>
+  );
+}
 
 function ReportsPage({ sales, purchases, debtPayments, creditPayments, expenses }) {
   const [filter, setFilter] = useState({ start: "", end: "" });
