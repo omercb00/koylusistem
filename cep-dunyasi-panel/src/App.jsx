@@ -73,10 +73,10 @@ function App() {
   useEffect(() => {
     if (!currentUser) return;
     const permissions = {
-      "Yönetici": ["dashboard", "sales", "purchases", "cash", "closing", "credits", "debts", "products", "expenses", "users", "reports", "backup"],
-      "Satış": ["dashboard", "sales", "cash", "credits", "products", "reports"],
-      "Kasa": ["dashboard", "sales", "cash", "credits", "expenses", "reports"],
-      "Stok": ["dashboard", "purchases", "debts", "products", "reports"],
+      "Yönetici": ["dashboard", "sales", "purchases", "cash", "closing", "credits", "debts", "products", "expenses", "users", "reports", "backup", "details"],
+      "Satış": ["dashboard", "sales", "cash", "credits", "products", "reports", "details"],
+      "Kasa": ["dashboard", "sales", "cash", "credits", "expenses", "reports", "details"],
+      "Stok": ["dashboard", "purchases", "debts", "products", "reports", "details"],
     };
     const allowed = permissions[currentUser.role] || [];
     if (!allowed.includes(activePage)) {
@@ -1010,10 +1010,10 @@ function App() {
   const isAdmin = currentUser?.role === "Yönetici";
 
   const rolePermissions = {
-    "Yönetici": ["dashboard", "sales", "purchases", "cash", "closing", "credits", "debts", "products", "expenses", "users", "reports", "backup"],
-    "Satış": ["dashboard", "sales", "cash", "credits", "products", "reports"],
-    "Kasa": ["dashboard", "sales", "cash", "credits", "expenses", "reports"],
-    "Stok": ["dashboard", "purchases", "debts", "products", "reports"],
+    "Yönetici": ["dashboard", "sales", "purchases", "cash", "closing", "credits", "debts", "products", "expenses", "users", "reports", "backup", "details"],
+    "Satış": ["dashboard", "sales", "cash", "credits", "products", "reports", "details"],
+    "Kasa": ["dashboard", "sales", "cash", "credits", "expenses", "reports", "details"],
+    "Stok": ["dashboard", "purchases", "debts", "products", "reports", "details"],
   };
 
   const canOpenPage = (page) => {
@@ -1093,6 +1093,7 @@ function App() {
           <MenuItem icon={<BarChart3 size={20} />} text="Günlük Devir" active={activePage === "closing"} onClick={() => openSafePage("closing")} />
           <MenuItem icon={<ReceiptText size={20} />} text="Veresiye / Alacak" active={activePage === "credits"} onClick={() => openSafePage("credits")} />
           <MenuItem icon={<ReceiptText size={20} />} text="Cari / Firma Borçları" active={activePage === "debts"} onClick={() => openSafePage("debts")} />
+          <MenuItem icon={<ReceiptText size={20} />} text="Müşteri / Firma Detay" active={activePage === "details"} onClick={() => openSafePage("details")} />
           <MenuItem icon={<Boxes size={20} />} text="Stok / Ürünler" active={activePage === "products"} onClick={() => openSafePage("products")} />
           <MenuItem icon={<ReceiptText size={20} />} text="Giderler" active={activePage === "expenses"} onClick={() => openSafePage("expenses")} />
           <MenuItem icon={<BarChart3 size={20} />} text="Raporlar & Grafikler" active={activePage === "reports"} onClick={() => openSafePage("reports")} />
@@ -1158,6 +1159,7 @@ function App() {
           {activePage === "closing" && canOpenPage("closing") && <DailyClosingPage cashBalance={cashBalance} cardBalance={cardBalance} remainingCredit={remainingCredit} totalCompanyDebt={totalCompanyDebt} dailyClosings={dailyClosings} addDailyClosing={addDailyClosing} />}
           {activePage === "credits" && canOpenPage("credits") && <CreditsPage customerCredits={customerCredits} customers={customers} creditForm={creditForm} setCreditForm={setCreditForm} addCreditPayment={addCreditPayment} creditPayments={creditPayments} />}
           {activePage === "debts" && canOpenPage("debts") && <DebtsPage supplierDebts={supplierDebts} suppliers={suppliers} debtForm={debtForm} setDebtForm={setDebtForm} addDebtPayment={addDebtPayment} debtPayments={debtPayments} usdRate={usdRate} usdStatus={usdStatus} loadUsdRate={loadUsdRate} />}
+          {activePage === "details" && canOpenPage("details") && <DetailsPage sales={sales} purchases={purchases} creditPayments={creditPayments} debtPayments={debtPayments} customerCredits={customerCredits} supplierDebts={supplierDebts} usdRate={usdRate} />}
           {activePage === "products" && canOpenPage("products") && <ProductsPage products={products} setProducts={setProducts} cloudStatus={cloudStatus} setCloudStatus={setCloudStatus} usdRate={usdRate} usdStatus={usdStatus} loadUsdRate={loadUsdRate} />}
           {activePage === "expenses" && canOpenPage("expenses") && <ExpensesPage expenseForm={expenseForm} setExpenseForm={setExpenseForm} addExpense={addExpense} deleteExpense={deleteExpense} expenses={expenses} />}
           {activePage === "users" && isAdmin && canOpenPage("users") && <UsersPage users={users} newUser={newUser} setNewUser={setNewUser} addUser={addUser} deleteUser={deleteUser} />}
@@ -1610,6 +1612,227 @@ function CashPage({ cashBalance, cardBalance, remainingCredit, totalCompanyDebt,
   );
 }
 
+
+
+function DetailsPage({ sales, purchases, creditPayments, debtPayments, customerCredits, supplierDebts, usdRate }) {
+  const [tab, setTab] = useState("customer");
+  const [selectedCustomer, setSelectedCustomer] = useState("");
+  const [selectedSupplier, setSelectedSupplier] = useState("");
+
+  const customers = Array.from(new Set([
+    ...sales.map((s) => s.customer).filter(Boolean).filter((x) => x !== "Belirtilmedi"),
+    ...creditPayments.map((p) => p.customer).filter(Boolean),
+    ...customerCredits.map((c) => c.customer).filter(Boolean),
+  ])).sort();
+
+  const suppliers = Array.from(new Set([
+    ...purchases.map((p) => p.supplier).filter(Boolean),
+    ...debtPayments.map((p) => p.supplier).filter(Boolean),
+    ...supplierDebts.map((d) => d.supplier).filter(Boolean),
+  ])).sort();
+
+  const customerName = selectedCustomer || customers[0] || "";
+  const supplierName = selectedSupplier || suppliers[0] || "";
+
+  const customerSales = sales.filter((s) => s.customer === customerName);
+  const customerPayments = creditPayments.filter((p) => p.customer === customerName);
+  const customerSaleTotal = customerSales.reduce((t, s) => t + Number(s.total || 0), 0);
+  const customerPaidTotal = customerPayments.reduce((t, p) => t + Number(p.amount || 0), 0);
+  const customerRemaining = Math.max(customerSaleTotal - customerPaidTotal, 0);
+
+  const supplierPurchases = purchases.filter((p) => p.supplier === supplierName);
+  const supplierPayments = debtPayments.filter((p) => p.supplier === supplierName);
+  const supplierPurchaseTotal = supplierPurchases.reduce((t, p) => t + Number(p.total || 0), 0);
+  const supplierPaidTotal = supplierPayments.reduce((t, p) => t + Number(p.amount || 0), 0);
+  const supplierRemaining = Math.max(supplierPurchaseTotal - supplierPaidTotal, 0);
+  const activeUsdRate = Number(usdRate || 0);
+
+  const customerRows = [
+    ...customerSales.map((s) => ({
+      id: `s-${s.id}`,
+      date: s.date,
+      type: "Satış",
+      desc: s.productName,
+      amount: money(s.total),
+      rawDate: s.date,
+    })),
+    ...customerPayments.map((p) => ({
+      id: `c-${p.id}`,
+      date: p.date,
+      type: "Tahsilat",
+      desc: p.paymentType,
+      amount: money(p.amount),
+      rawDate: p.date,
+    })),
+  ].sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
+
+  const supplierRows = [
+    ...supplierPurchases.map((p) => ({
+      id: `p-${p.id}`,
+      date: p.date,
+      type: "Alış",
+      desc: p.productName,
+      amount: moneyUSD(p.total),
+      rawDate: p.date,
+    })),
+    ...supplierPayments.map((p) => ({
+      id: `d-${p.id}`,
+      date: p.date,
+      type: "Ödeme",
+      desc: p.paymentType,
+      amount: moneyUSD(p.amount),
+      rawDate: p.date,
+    })),
+  ].sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
+
+  const printDetail = () => {
+    const isCustomer = tab === "customer";
+    const title = isCustomer ? `Müşteri Detay - ${customerName}` : `Firma Detay - ${supplierName}`;
+    const rows = isCustomer ? customerRows : supplierRows;
+    const summary = isCustomer
+      ? [
+          ["Satış Toplamı", money(customerSaleTotal)],
+          ["Tahsilat", money(customerPaidTotal)],
+          ["Kalan", money(customerRemaining)],
+        ]
+      : [
+          ["Alış Toplamı", moneyUSD(supplierPurchaseTotal)],
+          ["Ödenen", moneyUSD(supplierPaidTotal)],
+          ["Kalan", `${moneyUSD(supplierRemaining)} / ${money(supplierRemaining * activeUsdRate)}`],
+        ];
+
+    const html = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>${title}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; }
+            .head { border-bottom: 2px solid #0f172a; padding-bottom: 14px; }
+            h1 { margin: 0; font-size: 24px; }
+            .muted { color: #64748b; font-size: 12px; margin-top: 6px; }
+            .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 18px 0; }
+            .card { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; }
+            .label { color: #64748b; font-size: 12px; }
+            .value { font-size: 18px; font-weight: 900; margin-top: 5px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th { background: #0f172a; color: #fff; text-align: left; padding: 9px; }
+            td { border-bottom: 1px solid #e5e7eb; padding: 8px; }
+          </style>
+        </head>
+        <body>
+          <div class="head">
+            <h1>SAR ELEKTRONİK - CEP DÜNYASI</h1>
+            <div class="muted">${title} • ${new Date().toLocaleDateString("tr-TR")}</div>
+          </div>
+          <div class="cards">
+            ${summary.map((s) => `<div class="card"><div class="label">${s[0]}</div><div class="value">${s[1]}</div></div>`).join("")}
+          </div>
+          <table>
+            <thead><tr><th>Tarih</th><th>Tür</th><th>Açıklama</th><th>Tutar</th></tr></thead>
+            <tbody>
+              ${rows.map((r) => `<tr><td>${formatDate(r.date)}</td><td>${r.type}</td><td>${r.desc || ""}</td><td>${r.amount}</td></tr>`).join("") || `<tr><td colspan="4">Kayıt bulunamadı.</td></tr>`}
+            </tbody>
+          </table>
+          <script>window.onload = function(){ window.print(); };</script>
+        </body>
+      </html>
+    `;
+
+    const win = window.open("", "_blank");
+    win.document.write(html);
+    win.document.close();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl bg-slate-950 p-6 text-white">
+        <h3 className="text-2xl font-black">Müşteri / Firma Detay</h3>
+        <p className="mt-2 text-sm text-slate-300">Müşteri veresiye hareketleri ve firma cari hareketlerini tek ekranda incele.</p>
+      </div>
+
+      <div className="flex flex-wrap gap-3 rounded-2xl bg-white p-4 shadow-sm">
+        <button onClick={() => setTab("customer")} className={`rounded-xl px-5 py-3 font-bold ${tab === "customer" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"}`}>Müşteri Detay</button>
+        <button onClick={() => setTab("supplier")} className={`rounded-xl px-5 py-3 font-bold ${tab === "supplier" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"}`}>Firma Detay</button>
+        <button onClick={printDetail} className="rounded-xl bg-slate-950 px-5 py-3 font-bold text-white hover:bg-slate-800">PDF / Yazdır</button>
+      </div>
+
+      {tab === "customer" ? (
+        <div className="space-y-6">
+          <div className="rounded-2xl bg-white p-6 shadow-sm">
+            <label className="mb-2 block text-sm font-semibold text-slate-600">Müşteri seç</label>
+            <select className="w-full rounded-xl border border-slate-300 px-4 py-3" value={customerName} onChange={(e) => setSelectedCustomer(e.target.value)}>
+              {customers.length === 0 && <option>Henüz müşteri yok</option>}
+              {customers.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-3">
+            <StatCard title="Satış Toplamı" value={money(customerSaleTotal)} desc="Müşteriye yapılan satış" />
+            <StatCard title="Tahsilat" value={money(customerPaidTotal)} desc="Alınan ödeme" />
+            <StatCard title="Kalan Veresiye" value={money(customerRemaining)} desc="Kalan alacak" />
+          </div>
+
+          <DetailTable rows={customerRows} emptyText="Bu müşteriye ait hareket yok." />
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="rounded-2xl bg-white p-6 shadow-sm">
+            <label className="mb-2 block text-sm font-semibold text-slate-600">Firma seç</label>
+            <select className="w-full rounded-xl border border-slate-300 px-4 py-3" value={supplierName} onChange={(e) => setSelectedSupplier(e.target.value)}>
+              {suppliers.length === 0 && <option>Henüz firma yok</option>}
+              {suppliers.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-3">
+            <StatCard title="Alış Toplamı $" value={moneyUSD(supplierPurchaseTotal)} desc="Firmadan alınan ürün" />
+            <StatCard title="Ödenen $" value={moneyUSD(supplierPaidTotal)} desc="Firmaya yapılan ödeme" />
+            <StatCard title="Kalan Borç" value={`${moneyUSD(supplierRemaining)} / ${money(supplierRemaining * activeUsdRate)}`} desc="Dolar ve TL karşılığı" />
+          </div>
+
+          <DetailTable rows={supplierRows} emptyText="Bu firmaya ait hareket yok." />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailTable({ rows, emptyText }) {
+  return (
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
+      <h3 className="text-xl font-bold">Hareketler</h3>
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full min-w-[700px] text-left">
+          <thead>
+            <tr className="border-b text-sm text-slate-500">
+              <th className="py-3">Tarih</th>
+              <th>Tür</th>
+              <th>Açıklama</th>
+              <th>Tutar</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className="border-b">
+                <td className="py-4">{formatDate(r.date)}</td>
+                <td>{r.type}</td>
+                <td>{r.desc}</td>
+                <td className="font-bold">{r.amount}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan="4" className="py-5 text-slate-400">{emptyText}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 function CreditsPage({ customerCredits, customers, creditForm, setCreditForm, addCreditPayment, creditPayments }) {
   const [filter, setFilter] = useState({ start: "", end: "" });
@@ -3555,6 +3778,7 @@ function getPageTitle(page) {
     closing: "Günlük Devir",
     credits: "Veresiye / Alacak",
     debts: "Cari / Firma Borçları",
+    details: "Müşteri / Firma Detay",
     products: "Stok / Ürünler",
     expenses: "Giderler",
     reports: "Raporlar & Grafikler",
