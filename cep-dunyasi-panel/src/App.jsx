@@ -1145,111 +1145,153 @@ function Dashboard({
   debtPayments,
   creditPayments,
 }) {
-  const currentMonth = todayInput().slice(0, 7);
+  const todayKey = todayInput();
+  const monthKey = todayKey.slice(0, 7);
+  const activeUsdRate = Number(usdRate || 0);
 
-  const monthSales = sales.filter((s) => isoToInput(s.date).slice(0, 7) === currentMonth);
-  const monthPurchases = purchases.filter((p) => isoToInput(p.date).slice(0, 7) === currentMonth);
-  const monthExpenses = expenses.filter((e) => isoToInput(e.date).slice(0, 7) === currentMonth);
+  const todaySales = sales.filter((s) => isoToInput(s.date) === todayKey);
+  const todayPurchases = purchases.filter((p) => isoToInput(p.date) === todayKey);
+  const todayExpenses = expenses.filter((e) => isoToInput(e.date) === todayKey);
+  const todayDebtPayments = debtPayments.filter((p) => isoToInput(p.date) === todayKey);
+  const todayCreditPayments = creditPayments.filter((p) => isoToInput(p.date) === todayKey);
 
-  const totalSales = monthSales.reduce((t, s) => t + s.total, 0);
-  const totalPurchases = monthPurchases.reduce((t, p) => t + p.total, 0);
-  const totalExpenses = monthExpenses.reduce((t, e) => t + e.amount, 0);
-  const grossProfit = monthSales.reduce((t, s) => t + s.profit, 0);
-  const cleanNetProfit = grossProfit - totalExpenses;
+  const monthSales = sales.filter((s) => isoToInput(s.date).slice(0, 7) === monthKey);
+  const monthPurchases = purchases.filter((p) => isoToInput(p.date).slice(0, 7) === monthKey);
+  const monthExpenses = expenses.filter((e) => isoToInput(e.date).slice(0, 7) === monthKey);
+
+  const todaySalesTotal = todaySales.reduce((t, s) => t + Number(s.total || 0), 0);
+  const todayProfitTotal = todaySales.reduce((t, s) => t + Number(s.profit || 0), 0);
+  const todayExpenseTotal = todayExpenses.reduce((t, e) => t + Number(e.amount || 0), 0);
+  const todayPurchaseUsd = todayPurchases.reduce((t, p) => t + Number(p.total || 0), 0);
+  const todayDebtPaidUsd = todayDebtPayments.reduce((t, p) => t + Number(p.amount || 0), 0);
+  const todayCreditPaid = todayCreditPayments.reduce((t, p) => t + Number(p.amount || 0), 0);
+
+  const monthSalesTotal = monthSales.reduce((t, s) => t + Number(s.total || 0), 0);
+  const monthProfitTotal = monthSales.reduce((t, s) => t + Number(s.profit || 0), 0);
+  const monthExpenseTotal = monthExpenses.reduce((t, e) => t + Number(e.amount || 0), 0);
+  const monthPurchaseUsd = monthPurchases.reduce((t, p) => t + Number(p.total || 0), 0);
+
+  const topProducts = Object.values(
+    sales.reduce((acc, sale) => {
+      const key = sale.productName || "Bilinmeyen Ürün";
+      if (!acc[key]) {
+        acc[key] = { name: key, quantity: 0, total: 0 };
+      }
+      acc[key].quantity += Number(sale.quantity || 0);
+      acc[key].total += Number(sale.total || 0);
+      return acc;
+    }, {})
+  )
+    .sort((a, b) => b.quantity - a.quantity)
+    .slice(0, 5);
 
   const chartData = getLastSixMonths().map((m) => {
     const salesTotal = sales
       .filter((s) => isoToInput(s.date).slice(0, 7) === m.key)
-      .reduce((t, s) => t + s.total, 0);
-
-    const purchaseTotal = purchases
-      .filter((p) => isoToInput(p.date).slice(0, 7) === m.key)
-      .reduce((t, p) => t + p.total, 0);
+      .reduce((t, s) => t + Number(s.total || 0), 0);
 
     const expenseTotal = expenses
       .filter((e) => isoToInput(e.date).slice(0, 7) === m.key)
-      .reduce((t, e) => t + e.amount, 0);
+      .reduce((t, e) => t + Number(e.amount || 0), 0);
+
+    const profitTotal = sales
+      .filter((s) => isoToInput(s.date).slice(0, 7) === m.key)
+      .reduce((t, s) => t + Number(s.profit || 0), 0);
 
     return {
       name: m.label,
       Satış: salesTotal,
-      "Alış + Gider": purchaseTotal + expenseTotal,
+      Kâr: profitTotal,
+      Gider: expenseTotal,
     };
   });
-
-  const pieData = [
-    { name: "Nakit", value: Math.max(cashBalance, 0) },
-    { name: "Kart", value: Math.max(cardBalance, 0) },
-    { name: "Veresiye", value: Math.max(remainingCredit, 0) },
-  ];
 
   const lastTransactions = [
     ...sales.map((s) => ({
       id: `sale-${s.id}`,
       date: s.date,
-      desc: `Satış - ${s.paymentType} - ${s.productName}`,
-      type: "Satış",
-      amount: s.total,
-      positive: true,
-    })),
-    ...creditPayments.map((p) => ({
-      id: `credit-${p.id}`,
-      date: p.date,
-      desc: `Tahsilat - ${p.customer}`,
-      type: "Tahsilat",
-      amount: p.amount,
+      title: `Satış - ${s.productName}`,
+      type: s.paymentType,
+      amount: money(s.total),
       positive: true,
     })),
     ...expenses.map((e) => ({
       id: `expense-${e.id}`,
       date: e.date,
-      desc: `Gider - ${e.category}`,
-      type: "Gider",
-      amount: e.amount,
+      title: `Gider - ${e.category}`,
+      type: e.paymentType,
+      amount: money(e.amount),
       positive: false,
     })),
     ...purchases.map((p) => ({
       id: `purchase-${p.id}`,
       date: p.date,
-      desc: `Alış - ${p.supplier}`,
-      type: "Alış",
-      amount: p.total,
+      title: `Alış - ${p.productName}`,
+      type: p.supplier,
+      amount: moneyUSD(p.total),
       positive: false,
+    })),
+    ...creditPayments.map((p) => ({
+      id: `credit-${p.id}`,
+      date: p.date,
+      title: `Veresiye Tahsilat - ${p.customer}`,
+      type: p.paymentType,
+      amount: money(p.amount),
+      positive: true,
     })),
     ...debtPayments.map((p) => ({
       id: `debt-${p.id}`,
       date: p.date,
-      desc: `Firma Borç Ödeme - ${p.supplier}`,
-      type: "Ödeme",
-      amount: p.amount,
+      title: `Firma Borç Ödeme - ${p.supplier}`,
+      type: p.paymentType,
+      amount: moneyUSD(p.amount),
       positive: false,
     })),
   ]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 6);
+    .slice(0, 8);
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <DashboardCard title="Toplam Satış" value={money(totalSales)} desc="Bu dönem" color="from-green-700 to-green-500" />
-        <DashboardCard title="Toplam Alış" value={money(totalPurchases)} desc="Bu dönem" color="from-blue-800 to-blue-500" />
-        <DashboardCard title="Brüt Kâr" value={money(grossProfit)} desc="Satış kârı" color="from-orange-700 to-orange-500" />
-        <DashboardCard title="Toplam Gider" value={money(totalExpenses)} desc="Bu dönem" color="from-purple-800 to-purple-500" />
+      <div className="rounded-3xl bg-slate-950 p-6 text-white shadow-xl">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-blue-300">SAR ELEKTRONİK</p>
+            <h2 className="mt-2 text-3xl font-black tracking-tight">Cep Dünyası Yönetim Paneli</h2>
+            <p className="mt-2 text-sm text-slate-300">Satış, alış, kasa, cari ve rapor özetleri tek ekranda.</p>
+          </div>
 
-        <DashboardCard title="Nakit Kasa" value={money(cashBalance)} desc="Güncel bakiye" color="from-emerald-800 to-teal-600" />
-        <DashboardCard title="Kart Kasa" value={money(cardBalance)} desc="Güncel bakiye" color="from-blue-800 to-blue-600" />
-        <DashboardCard title="Veresiye Alacak" value={money(remainingCredit)} desc="Toplam alacak" color="from-yellow-700 to-yellow-500" />
-        <DashboardCard title="Firma Borç" value={moneyUSD(totalCompanyDebt)} desc={`Güncel TL: ${money(totalCompanyDebt * Number(usdRate || 0))}`} color="from-red-800 to-red-500" />
+          <div className="rounded-2xl bg-white/10 p-4 text-sm">
+            <p className="text-slate-300">Bugün</p>
+            <p className="mt-1 text-xl font-black">{new Date().toLocaleDateString("tr-TR")}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <DashboardCard title="Bugünkü Satış" value={money(todaySalesTotal)} desc={`${todaySales.length} satış kaydı`} color="from-blue-700 to-blue-500" />
+        <DashboardCard title="Bugünkü Kâr" value={money(todayProfitTotal)} desc={`Gider: ${money(todayExpenseTotal)}`} color="from-green-700 to-green-500" />
+        <DashboardCard title="Nakit Kasa" value={money(cashBalance)} desc="Anlık nakit durumu" color="from-slate-900 to-slate-700" />
+        <DashboardCard title="Kart Kasa" value={money(cardBalance)} desc="Kart tahsilat durumu" color="from-purple-700 to-purple-500" />
+      </div>
+
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard title="Aylık Satış" value={money(monthSalesTotal)} desc="Bu ay toplam satış" />
+        <StatCard title="Aylık Kâr" value={money(monthProfitTotal - monthExpenseTotal)} desc={`Brüt kâr: ${money(monthProfitTotal)}`} />
+        <StatCard title="Alış Toplamı" value={moneyUSD(monthPurchaseUsd)} desc="Bu ay dolar alış" />
+        <StatCard title="Firma Borç" value={moneyUSD(totalCompanyDebt)} desc={`Güncel TL: ${money(totalCompanyDebt * activeUsdRate)}`} />
       </div>
 
       <div className="grid gap-6 2xl:grid-cols-2">
         <div className="rounded-2xl bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold">Satış - Bütçe Grafiği</h3>
-            <span className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-600">Son 6 Ay</span>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xl font-bold">6 Aylık Performans</h3>
+              <p className="mt-1 text-sm text-slate-500">Satış, kâr ve gider karşılaştırması</p>
+            </div>
           </div>
 
-          <div className="mt-6 h-64 sm:h-80">
+          <div className="mt-6 h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -1257,92 +1299,103 @@ function Dashboard({
                 <YAxis />
                 <Tooltip formatter={(value) => money(value)} />
                 <Legend />
-                <Bar dataKey="Satış" fill="#2563eb" radius={[8, 8, 0, 0]} />
-                <Line type="monotone" dataKey="Alış + Gider" stroke="#f97316" strokeWidth={3} />
+                <Bar dataKey="Satış" />
+                <Bar dataKey="Kâr" />
+                <Bar dataKey="Gider" />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         <div className="rounded-2xl bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-bold">Nakit / Kart / Veresiye Dağılımı</h3>
+          <h3 className="text-xl font-bold">En Çok Satan Ürünler</h3>
+          <p className="mt-1 text-sm text-slate-500">Adet bazlı ilk 5 ürün</p>
 
-          <div className="mt-6 h-64 sm:h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={110} label>
-                  <Cell fill="#22c55e" />
-                  <Cell fill="#2563eb" />
-                  <Cell fill="#f59e0b" />
-                </Pie>
-                <Tooltip formatter={(value) => money(value)} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="mt-6 space-y-4">
+            {topProducts.map((p, index) => (
+              <div key={p.name} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 p-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-950 font-black text-white">
+                    {index + 1}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-bold">{p.name}</p>
+                    <p className="text-sm text-slate-500">{money(p.total)} satış</p>
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-blue-700">
+                  {p.quantity} adet
+                </div>
+              </div>
+            ))}
+
+            {topProducts.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-slate-400">
+                Henüz satış yok.
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="grid gap-6 2xl:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-3">
         <div className="rounded-2xl bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-bold">Son İşlemler</h3>
+          <h3 className="text-xl font-bold">Bugünkü Alış / Ödeme</h3>
+          <div className="mt-5 space-y-4">
+            <MiniStat label="Alış" value={moneyUSD(todayPurchaseUsd)} />
+            <MiniStat label="Firma Ödeme" value={moneyUSD(todayDebtPaidUsd)} />
+            <MiniStat label="Veresiye Tahsilat" value={money(todayCreditPaid)} />
+          </div>
+        </div>
 
+        <div className="rounded-2xl bg-white p-6 shadow-sm xl:col-span-2">
+          <h3 className="text-xl font-bold">Son İşlemler</h3>
           <div className="mt-5 overflow-x-auto">
             <table className="w-full min-w-[700px] text-left">
               <thead>
                 <tr className="border-b text-sm text-slate-500">
                   <th className="py-3">Tarih</th>
-                  <th>Açıklama</th>
+                  <th>İşlem</th>
                   <th>Tür</th>
                   <th>Tutar</th>
                 </tr>
               </thead>
-
               <tbody>
-                {lastTransactions.map((item) => (
-                  <tr key={item.id} className="border-b">
-                    <td className="py-4">{formatDate(item.date)}</td>
-                    <td>{item.desc}</td>
-                    <td>
-                      <span className="rounded-lg bg-slate-100 px-3 py-1 text-sm">
-                        {item.type}
-                      </span>
-                    </td>
-                    <td className={`font-bold ${item.positive ? "text-green-600" : "text-red-600"}`}>
-                      {item.positive ? "+" : "-"} {money(item.amount)}
+                {lastTransactions.map((t) => (
+                  <tr key={t.id} className="border-b">
+                    <td className="py-4">{formatDate(t.date)}</td>
+                    <td className="font-medium">{t.title}</td>
+                    <td>{t.type}</td>
+                    <td className={`font-bold ${t.positive ? "text-green-600" : "text-red-600"}`}>
+                      {t.positive ? "+" : "-"} {t.amount}
                     </td>
                   </tr>
                 ))}
 
                 {lastTransactions.length === 0 && (
                   <tr>
-                    <td colSpan="4" className="py-5 text-slate-400">
-                      Henüz işlem yok.
-                    </td>
+                    <td colSpan="4" className="py-5 text-slate-400">Henüz işlem yok.</td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
-
-        <div className="rounded-2xl bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-bold">Aylık Özet</h3>
-
-          <div className="mt-5 space-y-4">
-            <SummaryRow label="Toplam Satış" value={money(totalSales)} />
-            <SummaryRow label="Toplam Alış" value={money(totalPurchases)} />
-            <SummaryRow label="Brüt Kâr" value={money(grossProfit)} positive />
-            <SummaryRow label="Toplam Gider" value={money(totalExpenses)} negative />
-            <div className="rounded-xl bg-slate-100 p-4">
-              <SummaryRow label="Net Kâr" value={money(cleanNetProfit)} positive={cleanNetProfit >= 0} negative={cleanNetProfit < 0} big />
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
 }
+
+function MiniStat({ label, value }) {
+  return (
+    <div className="flex items-center justify-between rounded-2xl border border-slate-200 p-4">
+      <span className="text-sm font-semibold text-slate-500">{label}</span>
+      <span className="text-lg font-black">{value}</span>
+    </div>
+  );
+}
+
 
 function DailyClosingPage({ cashBalance, cardBalance, remainingCredit, totalCompanyDebt, dailyClosings, addDailyClosing }) {
   const [note, setNote] = useState("");
