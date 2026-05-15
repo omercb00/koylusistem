@@ -73,9 +73,9 @@ function App() {
   useEffect(() => {
     if (!currentUser) return;
     const permissions = {
-      "Yönetici": ["dashboard", "sales", "purchases", "cash", "closing", "credits", "debts", "products", "expenses", "users", "reports", "backup", "details"],
-      "Satış": ["dashboard", "sales", "cash", "credits", "products", "reports", "details"],
-      "Kasa": ["dashboard", "sales", "cash", "credits", "expenses", "reports", "details"],
+      "Yönetici": ["dashboard", "sales", "purchases", "cash", "closing", "credits", "debts", "products", "expenses", "users", "reports", "backup", "details", "quicksale"],
+      "Satış": ["dashboard", "sales", "cash", "credits", "products", "reports", "details", "quicksale"],
+      "Kasa": ["dashboard", "sales", "cash", "credits", "expenses", "reports", "details", "quicksale"],
       "Stok": ["dashboard", "purchases", "debts", "products", "reports", "details"],
     };
     const allowed = permissions[currentUser.role] || [];
@@ -1010,9 +1010,9 @@ function App() {
   const isAdmin = currentUser?.role === "Yönetici";
 
   const rolePermissions = {
-    "Yönetici": ["dashboard", "sales", "purchases", "cash", "closing", "credits", "debts", "products", "expenses", "users", "reports", "backup", "details"],
-    "Satış": ["dashboard", "sales", "cash", "credits", "products", "reports", "details"],
-    "Kasa": ["dashboard", "sales", "cash", "credits", "expenses", "reports", "details"],
+    "Yönetici": ["dashboard", "sales", "purchases", "cash", "closing", "credits", "debts", "products", "expenses", "users", "reports", "backup", "details", "quicksale"],
+    "Satış": ["dashboard", "sales", "cash", "credits", "products", "reports", "details", "quicksale"],
+    "Kasa": ["dashboard", "sales", "cash", "credits", "expenses", "reports", "details", "quicksale"],
     "Stok": ["dashboard", "purchases", "debts", "products", "reports", "details"],
   };
 
@@ -1088,6 +1088,7 @@ function App() {
         <nav className="h-[calc(100vh-105px)] space-y-2 overflow-y-auto p-4">
           <MenuItem icon={<Home size={20} />} text="Ana Panel" active={activePage === "dashboard"} onClick={() => openSafePage("dashboard")} />
           <MenuItem icon={<ShoppingCart size={20} />} text="Satış İşlemleri" active={activePage === "sales"} onClick={() => openSafePage("sales")} />
+          <MenuItem icon={<ShoppingCart size={20} />} text="Hızlı Satış" active={activePage === "quicksale"} onClick={() => openSafePage("quicksale")} />
           <MenuItem icon={<PackagePlus size={20} />} text="Alış İşlemleri" active={activePage === "purchases"} onClick={() => openSafePage("purchases")} />
           <MenuItem icon={<Wallet size={20} />} text="Kasa Yönetimi" active={activePage === "cash"} onClick={() => openSafePage("cash")} />
           <MenuItem icon={<BarChart3 size={20} />} text="Günlük Devir" active={activePage === "closing"} onClick={() => openSafePage("closing")} />
@@ -1154,6 +1155,7 @@ function App() {
           )}
 
           {activePage === "sales" && canOpenPage("sales") && <SalesPage products={products} saleForm={saleForm} setSaleForm={setSaleForm} addSale={addSale} sales={sales} deleteSale={deleteSale} selectProductByBarcode={selectProductByBarcode} />}
+          {activePage === "quicksale" && canOpenPage("quicksale") && <QuickSalePage products={products} saleForm={saleForm} setSaleForm={setSaleForm} addSale={addSale} selectProductByBarcode={selectProductByBarcode} />}
           {activePage === "purchases" && canOpenPage("purchases") && <PurchasesPage products={products} purchaseForm={purchaseForm} setPurchaseForm={setPurchaseForm} addPurchase={addPurchase} purchases={purchases} selectProductByBarcode={selectProductByBarcode} usdRate={usdRate} usdStatus={usdStatus} loadUsdRate={loadUsdRate} />}
           {activePage === "cash" && canOpenPage("cash") && <CashPage cashBalance={cashBalance} cardBalance={cardBalance} remainingCredit={remainingCredit} totalCompanyDebt={totalCompanyDebt} sales={sales} debtPayments={debtPayments} creditPayments={creditPayments} expenses={expenses} />}
           {activePage === "closing" && canOpenPage("closing") && <DailyClosingPage cashBalance={cashBalance} cardBalance={cardBalance} remainingCredit={remainingCredit} totalCompanyDebt={totalCompanyDebt} dailyClosings={dailyClosings} addDailyClosing={addDailyClosing} />}
@@ -3773,6 +3775,7 @@ function getPageTitle(page) {
   return {
     dashboard: "Ana Panel",
     sales: "Satış İşlemleri",
+    quicksale: "Hızlı Satış",
     purchases: "Alış İşlemleri",
     cash: "Kasa Yönetimi",
     closing: "Günlük Devir",
@@ -3829,6 +3832,201 @@ function filterByDate(items, start, end) {
 }
 
 export default App;
+
+
+function QuickSalePage({ products, saleForm, setSaleForm, addSale, selectProductByBarcode }) {
+  const selectedProduct = products.find((p) => p.id === Number(saleForm.productId));
+  const quantity = Number(saleForm.quantity) || 0;
+  const price = Number(saleForm.price) || 0;
+  const total = quantity * price;
+
+  const resetQuickSale = () => {
+    setSaleForm({
+      productId: "",
+      barcodeSearch: "",
+      quantity: 1,
+      price: "",
+      paymentType: "Nakit",
+      customer: "",
+      note: "",
+      date: todayInput(),
+    });
+  };
+
+  const fillProduct = (product) => {
+    setSaleForm({
+      ...saleForm,
+      productId: String(product.id),
+      barcodeSearch: product.barcode || "",
+      price: product.sellPrice || "",
+      quantity: saleForm.quantity || 1,
+      date: saleForm.date || todayInput(),
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl bg-slate-950 p-6 text-white shadow-xl">
+        <h3 className="text-2xl font-black">Hızlı Satış</h3>
+        <p className="mt-2 text-sm text-slate-300">Barkod okut, ürünü seç, tek tuşla satış kaydet.</p>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
+        <div className="rounded-2xl bg-white p-6 shadow-sm">
+          <h3 className="text-xl font-bold">Satış Bilgileri</h3>
+
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
+            <BarcodeInput
+              label="Barkod"
+              value={saleForm.barcodeSearch}
+              onChange={(value) => setSaleForm({ ...saleForm, barcodeSearch: value })}
+              onSubmit={(value) => selectProductByBarcode(value, "sale")}
+            />
+
+            <InputSelect
+              label="Ürün seç"
+              value={saleForm.productId}
+              onChange={(e) => {
+                const p = products.find((x) => x.id === Number(e.target.value));
+                if (p) fillProduct(p);
+                else setSaleForm({ ...saleForm, productId: e.target.value });
+              }}
+              products={products}
+            />
+
+            <InputBox
+              label="Adet"
+              type="number"
+              value={saleForm.quantity}
+              onChange={(e) => setSaleForm({ ...saleForm, quantity: e.target.value })}
+            />
+
+            <InputBox
+              label="Satış Fiyatı ₺"
+              type="number"
+              value={saleForm.price}
+              onChange={(e) => setSaleForm({ ...saleForm, price: e.target.value })}
+            />
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-600">Ödeme Türü</label>
+              <select
+                className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                value={saleForm.paymentType}
+                onChange={(e) => setSaleForm({ ...saleForm, paymentType: e.target.value })}
+              >
+                <option>Nakit</option>
+                <option>Kart</option>
+                <option>Veresiye</option>
+              </select>
+            </div>
+
+            <InputBox
+              label="Müşteri"
+              placeholder="Opsiyonel"
+              value={saleForm.customer}
+              onChange={(e) => setSaleForm({ ...saleForm, customer: e.target.value })}
+            />
+          </div>
+
+          <div className="mt-5">
+            <InputBox
+              label="Açıklama"
+              placeholder="Opsiyonel"
+              value={saleForm.note}
+              onChange={(e) => setSaleForm({ ...saleForm, note: e.target.value })}
+            />
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl bg-slate-100 p-4">
+              <p className="text-sm text-slate-500">Ürün</p>
+              <p className="mt-1 truncate text-lg font-black">{selectedProduct?.name || "Seçilmedi"}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-100 p-4">
+              <p className="text-sm text-slate-500">Stok</p>
+              <p className={`mt-1 text-lg font-black ${selectedProduct?.stock <= 0 ? "text-red-600" : "text-slate-900"}`}>
+                {selectedProduct ? selectedProduct.stock : "-"}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-blue-50 p-4">
+              <p className="text-sm text-blue-600">Toplam</p>
+              <p className="mt-1 text-2xl font-black text-blue-700">{money(total)}</p>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              onClick={addSale}
+              className="rounded-xl bg-blue-600 px-6 py-4 text-lg font-black text-white hover:bg-blue-700"
+            >
+              Satışı Kaydet
+            </button>
+            <button
+              onClick={resetQuickSale}
+              className="rounded-xl bg-slate-100 px-6 py-4 font-bold text-slate-700 hover:bg-slate-200"
+            >
+              Temizle
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-white p-6 shadow-sm">
+          <h3 className="text-xl font-bold">Ürün Önizleme</h3>
+
+          {selectedProduct ? (
+            <div className="mt-5 space-y-4">
+              {selectedProduct.imageUrl ? (
+                <img
+                  src={selectedProduct.imageUrl}
+                  alt={selectedProduct.name}
+                  className="h-56 w-full rounded-2xl object-cover"
+                />
+              ) : (
+                <div className="flex h-56 w-full items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                  Görsel yok
+                </div>
+              )}
+
+              <div>
+                <p className="text-sm text-slate-500">Ürün adı</p>
+                <p className="text-xl font-black">{selectedProduct.name}</p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <MiniStat label="Barkod" value={selectedProduct.barcode || "-"} />
+                <MiniStat label="Satış" value={money(selectedProduct.sellPrice)} />
+                <MiniStat label="Alış $" value={moneyUSD(selectedProduct.buyPrice)} />
+                <MiniStat label="Stok" value={selectedProduct.stock} />
+              </div>
+            </div>
+          ) : (
+            <div className="mt-5 rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-400">
+              Barkod okut veya ürün seç.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <h3 className="text-xl font-bold">Hızlı Ürün Seç</h3>
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {products.slice(0, 12).map((p) => (
+            <button
+              key={p.id}
+              onClick={() => fillProduct(p)}
+              className="rounded-2xl border border-slate-200 p-4 text-left hover:border-blue-500 hover:bg-blue-50"
+            >
+              <p className="truncate font-bold">{p.name}</p>
+              <p className="mt-1 text-sm text-slate-500">Stok: {p.stock}</p>
+              <p className="mt-2 font-black text-blue-700">{money(p.sellPrice)}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SalesPage({ products, saleForm, setSaleForm, addSale, sales, deleteSale, selectProductByBarcode }) {
   const [filter, setFilter] = useState({ start: "", end: "" });
