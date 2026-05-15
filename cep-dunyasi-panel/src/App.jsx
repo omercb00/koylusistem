@@ -995,7 +995,6 @@ function App() {
           <input type="password" className="mt-4 w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="Şifrenizi girin" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login()} />
 
           <button onClick={login} className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white">Giriş Yap</button>
-          <p className="mt-5 text-center text-xs text-slate-400">Varsayılan: </p>
         </div>
       </div>
     );
