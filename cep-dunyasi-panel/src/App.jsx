@@ -37,8 +37,8 @@ const defaultUsers = [
   {
     id: 1,
     name: "Ömer Can Buğdaycı",
-    username: "omer",
-    password: "1234",
+    username: "",
+    password: "",
     role: "Yönetici",
   },
 ];
@@ -50,9 +50,15 @@ const defaultProducts = [
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [activePage, setActivePage] = useState("dashboard");
+  const [activePage, setActivePage] = useState(() => localStorage.getItem("cepDunyasiActivePage") || "dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("cepDunyasiCurrentUser") || "null");
+    } catch {
+      return null;
+    }
+  });
   const [cloudStatus, setCloudStatus] = useState("Bulut hazır");
   const [toast, setToast] = useState(null);
   const [usdRate, setUsdRate] = useState(0);
@@ -367,18 +373,21 @@ function App() {
     const user = users.find((u) => u.username === loginUsername && u.password === loginPassword);
     if (!user) return alert("Kullanıcı adı veya şifre hatalı");
     setCurrentUser(user);
+      localStorage.setItem("cepDunyasiCurrentUser", JSON.stringify(user));
     setIsLoggedIn(true);
   };
 
   const logout = () => {
     setIsLoggedIn(false);
     setCurrentUser(null);
+    localStorage.removeItem("cepDunyasiCurrentUser");
     setLoginUsername("");
     setLoginPassword("");
   };
 
   const changePage = (page) => {
     setActivePage(page);
+    localStorage.setItem("cepDunyasiActivePage", page);
     setSidebarOpen(false);
   };
 
@@ -982,11 +991,11 @@ function App() {
             <p className="mt-1 text-sm font-semibold text-blue-600">Yönetim: Ömer Can Buğdaycı</p>
           </div>
 
-          <input className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="Kullanıcı adı" value={loginUsername} onChange={(e) => setLoginUsername(e.target.value)} />
-          <input type="password" className="mt-4 w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="Şifre" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login()} />
+          <input className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="Kullanıcı adınızı girin" value={loginUsername} onChange={(e) => setLoginUsername(e.target.value)} />
+          <input type="password" className="mt-4 w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="Şifrenizi girin" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login()} />
 
           <button onClick={login} className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white">Giriş Yap</button>
-          <p className="mt-5 text-center text-xs text-slate-400">Varsayılan: omer / 1234</p>
+          <p className="mt-5 text-center text-xs text-slate-400">Varsayılan: </p>
         </div>
       </div>
     );
@@ -1511,10 +1520,16 @@ function CreditsPage({ customerCredits, customers, creditForm, setCreditForm, ad
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <div>
             <label className="mb-2 block text-sm font-semibold text-slate-600">Müşteri</label>
-            <select className="w-full rounded-xl border border-slate-300 px-4 py-3" value={creditForm.customer} onChange={(e) => setCreditForm({ ...creditForm, customer: e.target.value })}>
-              <option value="">Müşteri seç</option>
-              {customers.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <input
+              list="customer-list"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3"
+              placeholder="Müşteri seç veya yeni müşteri yaz"
+              value={creditForm.customer}
+              onChange={(e) => setCreditForm({ ...creditForm, customer: e.target.value })}
+            />
+            <datalist id="customer-list">
+              {customers.map((c) => <option key={c} value={c} />)}
+            </datalist>
           </div>
 
           <InputBox label="Tahsilat Tutarı" type="number" placeholder="Tutar" value={creditForm.amount} onChange={(e) => setCreditForm({ ...creditForm, amount: e.target.value })} />
@@ -1771,6 +1786,141 @@ function PurchasesPage({ products, purchaseForm, setPurchaseForm, addPurchase, p
   );
 }
 
+
+function ExpensesPage({ expenseForm, setExpenseForm, addExpense, deleteExpense, expenses }) {
+  const [filter, setFilter] = useState({ start: "", end: "" });
+  const filteredExpenses = filterByDate(expenses, filter.start, filter.end);
+  const totalExpense = filteredExpenses.reduce((t, e) => t + e.amount, 0);
+
+  const categories = ["Kira", "Yemek", "Yol", "Kargo", "Reklam", "Personel", "Mağaza", "Fatura", "Diğer"];
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <h3 className="text-xl font-bold">Yeni Gider Ekle</h3>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-600">Gider Kategorisi</label>
+            <select
+              className="w-full rounded-xl border border-slate-300 px-4 py-3"
+              value={expenseForm.category}
+              onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
+            >
+              {categories.map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <InputBox label="Tutar" type="number" placeholder="Gider tutarı" value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} />
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-600">Ödeme Türü</label>
+            <select
+              className="w-full rounded-xl border border-slate-300 px-4 py-3"
+              value={expenseForm.paymentType}
+              onChange={(e) => setExpenseForm({ ...expenseForm, paymentType: e.target.value })}
+            >
+              <option>Nakit</option>
+              <option>Kart</option>
+            </select>
+          </div>
+
+          <InputBox label="Tarih" type="date" value={expenseForm.date} onChange={(e) => setExpenseForm({ ...expenseForm, date: e.target.value })} />
+          <InputBox label="Açıklama" placeholder="Açıklama" value={expenseForm.note} onChange={(e) => setExpenseForm({ ...expenseForm, note: e.target.value })} />
+        </div>
+
+        <button onClick={addExpense} className="mt-5 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-700">
+          Gider Kaydet
+        </button>
+      </div>
+
+      <DateFilter filter={filter} setFilter={setFilter} />
+
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard title="Filtreli Gider" value={money(totalExpense)} desc="Seçilen tarih aralığı" />
+        <StatCard title="Gider Sayısı" value={String(filteredExpenses.length)} desc="Kayıt adedi" />
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-xl font-bold">Gider Listesi</h3>
+          <div className="flex flex-wrap gap-2">
+            <ExportButton
+              filename="gider-listesi.csv"
+              rows={filteredExpenses}
+              columns={[
+                ["Tarih", (r) => formatDate(r.date)],
+                ["Kategori", "category"],
+                ["Ödeme", "paymentType"],
+                ["Tutar", "amount"],
+                ["Açıklama", "note"],
+                ["Kullanıcı", "user"],
+              ]}
+            />
+            <PrintButton
+              title="Gider Listesi"
+              rows={filteredExpenses}
+              columns={[
+                ["Tarih", (r) => formatDate(r.date)],
+                ["Kategori", "category"],
+                ["Ödeme", "paymentType"],
+                ["Tutar", (r) => money(r.amount)],
+                ["Açıklama", "note"],
+                ["Kullanıcı", "user"],
+              ]}
+              summary={[
+                { label: "Toplam Gider", value: money(filteredExpenses.reduce((t, r) => t + r.amount, 0)) },
+                { label: "Kayıt Sayısı", value: filteredExpenses.length },
+              ]}
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full min-w-[900px] text-left">
+            <thead>
+              <tr className="border-b text-sm text-slate-500">
+                <th className="py-3">Tarih</th>
+                <th>Kategori</th>
+                <th>Ödeme</th>
+                <th>Tutar</th>
+                <th>Açıklama</th>
+                <th>Kullanıcı</th>
+                <th>İşlem</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {filteredExpenses.map((e) => (
+                <tr key={e.id} className="border-b">
+                  <td className="py-4">{formatDate(e.date)}</td>
+                  <td>{e.category}</td>
+                  <td>{e.paymentType}</td>
+                  <td className="font-semibold text-red-600">{money(e.amount)}</td>
+                  <td>{e.note || "-"}</td>
+                  <td>{e.user || "-"}</td>
+                  <td>
+                    <button onClick={() => deleteExpense(e.id)} className="rounded-lg bg-red-50 px-3 py-2 text-red-600 hover:bg-red-100">
+                      Sil
+                    </button>
+                  </td>
+                </tr>
+              ))}
+
+              {filteredExpenses.length === 0 && (
+                <tr>
+                  <td colSpan="8" className="py-5 text-slate-400">
+                    Bu tarih aralığında gider yok.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function DebtsPage({
   supplierDebts,
