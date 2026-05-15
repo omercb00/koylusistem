@@ -1096,6 +1096,7 @@ function App() {
           <MenuItem icon={<Boxes size={20} />} text="Stok / Ürünler" active={activePage === "products"} onClick={() => openSafePage("products")} />
           <MenuItem icon={<ReceiptText size={20} />} text="Giderler" active={activePage === "expenses"} onClick={() => openSafePage("expenses")} />
           <MenuItem icon={<BarChart3 size={20} />} text="Raporlar & Grafikler" active={activePage === "reports"} onClick={() => openSafePage("reports")} />
+          <MenuItem icon={<ReceiptText size={20} />} text="Yedek / Dışa Aktar" active={activePage === "backup"} onClick={() => openSafePage("backup")} />
           {isAdmin && <MenuItem icon={<Users size={20} />} text="Kullanıcı Yönetimi" active={activePage === "users"} onClick={() => openSafePage("users")} />}
         </nav>
       </aside>
