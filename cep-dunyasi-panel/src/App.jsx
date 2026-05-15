@@ -464,6 +464,20 @@ function App() {
 
       setCloudStatus("Satış buluta kaydedildi");
       showToast("Satış buluta kaydedildi");
+      const whatsappText =
+  `📦 Cep Dünyası Satış Fişi
+
+Ürün: ${product.name}
+Adet: ${quantity}
+Toplam: ${total} TL
+Ödeme: ${saleForm.paymentType}
+
+Teşekkür ederiz 🙏`;
+
+window.open(
+  `https://wa.me/?text=${encodeURIComponent(whatsappText)}`,
+  "_blank"
+);
     } catch (error) {
       console.log("Satış ekleme hatası:", error);
       setCloudStatus("Satış buluta eklenemedi");
