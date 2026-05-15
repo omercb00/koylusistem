@@ -50,13 +50,15 @@ const defaultProducts = [
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return !!localStorage.getItem("cepDunyasiCurrentUser");
+    return localStorage.getItem("cepDunyasiLoggedIn") === "true" || !!localStorage.getItem("cepDunyasiCurrentUser");
   });
   const [activePage, setActivePage] = useState(() => localStorage.getItem("cepDunyasiActivePage") || "dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem("cepDunyasiCurrentUser") || "null");
+      const savedUser = localStorage.getItem("cepDunyasiCurrentUser");
+      if (!savedUser) return null;
+      return JSON.parse(savedUser);
     } catch {
       return null;
     }
@@ -381,14 +383,16 @@ function App() {
     const user = users.find((u) => u.username === loginUsername && u.password === loginPassword);
     if (!user) return alert("Kullanıcı adı veya şifre hatalı");
     setCurrentUser(user);
-      localStorage.setItem("cepDunyasiCurrentUser", JSON.stringify(user));
     setIsLoggedIn(true);
+    localStorage.setItem("cepDunyasiCurrentUser", JSON.stringify(user));
+    localStorage.setItem("cepDunyasiLoggedIn", "true");
   };
 
   const logout = () => {
     setIsLoggedIn(false);
     setCurrentUser(null);
     localStorage.removeItem("cepDunyasiCurrentUser");
+    localStorage.removeItem("cepDunyasiLoggedIn");
     setLoginUsername("");
     setLoginPassword("");
   };
@@ -464,20 +468,6 @@ function App() {
 
       setCloudStatus("Satış buluta kaydedildi");
       showToast("Satış buluta kaydedildi");
-      const whatsappText =
-  `📦 Cep Dünyası Satış Fişi
-
-Ürün: ${product.name}
-Adet: ${quantity}
-Toplam: ${total} TL
-Ödeme: ${saleForm.paymentType}
-
-Teşekkür ederiz 🙏`;
-
-window.open(
-  `https://wa.me/?text=${encodeURIComponent(whatsappText)}`,
-  "_blank"
-);
     } catch (error) {
       console.log("Satış ekleme hatası:", error);
       setCloudStatus("Satış buluta eklenemedi");
@@ -1002,7 +992,7 @@ window.open(
 
   const isAdmin = currentUser?.role === "Yönetici";
 
-  if (!isLoggedIn) {
+  if (!currentUser) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
         <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl">
@@ -1442,7 +1432,7 @@ function DailyClosingPage({ cashBalance, cardBalance, remainingCredit, totalComp
 
               {filteredClosings.length === 0 && (
                 <tr>
-                  <td colSpan="12" className="py-5 text-slate-400">
+                  <td colSpan="13" className="py-5 text-slate-400">
                     Henüz devir kaydı yok.
                   </td>
                 </tr>
@@ -2662,6 +2652,39 @@ function UsersPage({ users, newUser, setNewUser, addUser, deleteUser }) {
 
 
 
+
+function WhatsAppButton({ sale }) {
+  const sendWhatsApp = () => {
+    const text = `CEP DÜNYASI - SATIŞ FİŞİ
+
+Firma: SAR ELEKTRONİK
+Telefon: 533 810 75 25
+Adres: Cumhuriyet, Kaleönü Cad No:36/B, Melikgazi/Kayseri
+
+Tarih: ${formatDate(sale.date)}
+Ürün: ${sale.productName || ""}
+Barkod: ${sale.barcode || "-"}
+Adet: ${sale.quantity}
+Birim Fiyat: ${money(sale.unitPrice)}
+Toplam: ${money(sale.total)}
+Ödeme: ${sale.paymentType || "Nakit"}
+Müşteri: ${sale.customer || "Belirtilmedi"}
+
+Bizi tercih ettiğiniz için teşekkür ederiz.`;
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  };
+
+  return (
+    <button
+      onClick={sendWhatsApp}
+      className="rounded-lg bg-green-600 px-3 py-2 text-sm font-bold text-white hover:bg-green-700"
+    >
+      WhatsApp
+    </button>
+  );
+}
+
 function ReceiptButton({ sale }) {
   const printReceipt = () => {
     const html = `
@@ -3216,6 +3239,7 @@ function SalesPage({ products, saleForm, setSaleForm, addSale, sales, deleteSale
                 <th>Kâr</th>
                 <th>Müşteri</th>
                 <th>Fiş</th>
+                <th>WhatsApp</th>
                 <th>İşlem</th>
               </tr>
             </thead>
@@ -3233,6 +3257,7 @@ function SalesPage({ products, saleForm, setSaleForm, addSale, sales, deleteSale
                   <td className="font-semibold text-green-600">{money(s.profit)}</td>
                   <td>{s.customer}</td>
                   <td><ReceiptButton sale={s} /></td>
+                  <td><WhatsAppButton sale={s} /></td>
                   <td><button onClick={() => deleteSale(s.id)} className="rounded-lg bg-red-50 px-3 py-2 text-red-600 hover:bg-red-100">Sil</button></td>
                 </tr>
               ))}
