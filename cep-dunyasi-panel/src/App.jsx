@@ -2336,6 +2336,7 @@ function ProductsPage({ products, setProducts, cloudStatus, setCloudStatus, usdR
 
 function ReportsPage({ sales, purchases, debtPayments, creditPayments, expenses }) {
   const [filter, setFilter] = useState({ start: "", end: "" });
+
   const fs = filterByDate(sales, filter.start, filter.end);
   const fp = filterByDate(purchases, filter.start, filter.end);
   const fd = filterByDate(debtPayments, filter.start, filter.end);
@@ -2348,57 +2349,150 @@ function ReportsPage({ sales, purchases, debtPayments, creditPayments, expenses 
   const totalDebtPaid = fd.reduce((t, p) => t + p.amount, 0);
   const totalCreditPaid = fc.reduce((t, p) => t + p.amount, 0);
   const totalExpenses = fe.reduce((t, e) => t + e.amount, 0);
+  const net = totalProfit - totalExpenses;
 
   return (
     <div className="space-y-6">
       <DateFilter filter={filter} setFilter={setFilter} />
 
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <h3 className="text-xl font-bold">Excel Çıktıları</h3>
-        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <ExportButton filename="rapor-satis.csv" rows={fs} columns={[["Tarih", (r) => formatDate(r.date)], ["Ürün", "productName"], ["Ödeme", "paymentType"], ["Toplam", "total"], ["Kâr", "profit"], ["Müşteri", "customer"]]} />
-          <ExportButton filename="rapor-alis.csv" rows={fp} columns={[["Tarih", (r) => formatDate(r.date)], ["Ürün", "productName"], ["Firma", "supplier"], ["Toplam", "total"]]} />
-          <ExportButton filename="rapor-gider.csv" rows={fe} columns={[["Tarih", (r) => formatDate(r.date)], ["Kategori", "category"], ["Ödeme", "paymentType"], ["Tutar", "amount"]]} />
-          <ExportButton filename="rapor-odemeler.csv" rows={[...fd, ...fc]} columns={[["Tarih", (r) => formatDate(r.date)], ["İsim/Firma", (r) => r.supplier || r.customer || ""], ["Ödeme", "paymentType"], ["Tutar", "amount"], ["Not", "note"]]} />
-        </div>
+      <div className="grid gap-5 md:grid-cols-3">
+        <StatCard title="Satış Toplamı" value={money(totalSales)} desc="Seçili tarih aralığı" />
+        <StatCard title="Kâr" value={money(totalProfit)} desc="Satış kârı" />
+        <StatCard title="Net" value={money(net)} desc="Kâr - gider" />
+        <StatCard title="Gider" value={money(totalExpenses)} desc="Gider toplamı" />
+        <StatCard title="Alış $" value={moneyUSD(totalPurchases)} desc="Alış toplamı" />
+        <StatCard title="Tahsilat" value={money(totalCreditPaid)} desc="Veresiye tahsilat" />
+      </div>
 
-        <div className="mt-4">
-          <PrintButton
-            title="Genel Rapor"
-            rows={[
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <h3 className="text-xl font-bold">Kurumsal PDF Raporlar</h3>
+        <p className="mt-2 text-sm text-slate-500">Seçtiğin tarih aralığına göre rapor oluşturur. Yazdır ekranından PDF olarak kaydedebilirsin.</p>
+
+        <div className="mt-5 flex flex-wrap gap-3">
+          <CorporateReportButton
+            title="Satış Raporu"
+            rows={fs}
+            columns={[
+              ["Tarih", (r) => formatDate(r.date)],
+              ["Ürün", "productName"],
+              ["Firma", (r) => r.supplier || "Belirtilmedi"],
+              ["Adet", "quantity"],
+              ["Ödeme", "paymentType"],
+              ["Toplam", (r) => money(r.total)],
+              ["Kâr", (r) => money(r.profit)],
+              ["Müşteri", "customer"],
+            ]}
+            summary={[
               { label: "Toplam Satış", value: money(totalSales) },
-              { label: "Toplam Alış", value: money(totalPurchases) },
+              { label: "Toplam Kâr", value: money(totalProfit) },
+              { label: "Satış Sayısı", value: fs.length },
+            ]}
+          />
+
+          <CorporateReportButton
+            title="Gider Raporu"
+            rows={fe}
+            columns={[
+              ["Tarih", (r) => formatDate(r.date)],
+              ["Kategori", "category"],
+              ["Ödeme", "paymentType"],
+              ["Tutar", (r) => money(r.amount)],
+              ["Açıklama", "note"],
+              ["Kullanıcı", "user"],
+            ]}
+            summary={[
               { label: "Toplam Gider", value: money(totalExpenses) },
-              { label: "Net Kâr", value: money(totalProfit - totalExpenses) },
-              { label: "Borç Ödemesi", value: money(totalDebtPaid) },
+              { label: "Kayıt Sayısı", value: fe.length },
+              { label: "Net Kâr", value: money(net) },
+            ]}
+          />
+
+          <CorporateReportButton
+            title="Alış Raporu"
+            rows={fp}
+            columns={[
+              ["Tarih", (r) => formatDate(r.date)],
+              ["Ürün", "productName"],
+              ["Firma", "supplier"],
+              ["Adet", "quantity"],
+              ["Alış $", (r) => moneyUSD(r.buyPrice)],
+              ["Toplam $", (r) => moneyUSD(r.total)],
+              ["Alan", "buyer"],
+            ]}
+            summary={[
+              { label: "Toplam Alış $", value: moneyUSD(totalPurchases) },
+              { label: "Kayıt Sayısı", value: fp.length },
+              { label: "Borç Ödeme $", value: moneyUSD(totalDebtPaid) },
+            ]}
+          />
+
+          <CorporateReportButton
+            title="Cari ve Veresiye Raporu"
+            rows={[...fd.map((x) => ({ ...x, type: "Firma Borç Ödeme" })), ...fc.map((x) => ({ ...x, type: "Veresiye Tahsilat" }))]}
+            columns={[
+              ["Tarih", (r) => formatDate(r.date)],
+              ["Tür", "type"],
+              ["Kişi/Firma", (r) => r.supplier || r.customer || ""],
+              ["Ödeme", "paymentType"],
+              ["Tutar", (r) => r.supplier ? moneyUSD(r.amount) : money(r.amount)],
+              ["Açıklama", "note"],
+            ]}
+            summary={[
+              { label: "Firma Ödeme $", value: moneyUSD(totalDebtPaid) },
               { label: "Veresiye Tahsilat", value: money(totalCreditPaid) },
+              { label: "Kayıt Sayısı", value: fd.length + fc.length },
+            ]}
+          />
+
+          <CorporateReportButton
+            title="Genel Özet Raporu"
+            rows={[
+              { name: "Satış Toplamı", value: money(totalSales) },
+              { name: "Kâr", value: money(totalProfit) },
+              { name: "Gider", value: money(totalExpenses) },
+              { name: "Net", value: money(net) },
+              { name: "Alış Toplamı", value: moneyUSD(totalPurchases) },
+              { name: "Veresiye Tahsilat", value: money(totalCreditPaid) },
+              { name: "Firma Borç Ödeme", value: moneyUSD(totalDebtPaid) },
             ]}
             columns={[
-              ["Başlık", "label"],
+              ["Kalem", "name"],
               ["Tutar", "value"],
+            ]}
+            summary={[
+              { label: "Net", value: money(net) },
+              { label: "Satış", value: money(totalSales) },
+              { label: "Kâr", value: money(totalProfit) },
             ]}
           />
         </div>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Filtreli Satış" value={money(totalSales)} desc="Seçilen tarih aralığı" />
-        <StatCard title="Filtreli Alış" value={money(totalPurchases)} desc="Seçilen tarih aralığı" />
-        <StatCard title="Filtreli Kâr" value={money(totalProfit - totalExpenses)} desc="Satış kârı - gider" />
-        <StatCard title="Borç Ödemesi" value={money(totalDebtPaid)} desc="Seçilen tarih aralığı" />
-        <StatCard title="Veresiye Tahsilat" value={money(totalCreditPaid)} desc="Seçilen tarih aralığı" />
-        <StatCard title="Giderler" value={money(totalExpenses)} desc="Seçilen tarih aralığı" />
-      </div>
       <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <h3 className="text-xl font-bold">Sistem Yorumu</h3>
-        <p className="mt-3 text-slate-600">
-          Seçilen tarih aralığında toplam satış {money(totalSales)}, toplam alış {money(totalPurchases)}, gider {money(totalExpenses)}, net kâr {money(totalProfit - totalExpenses)} görünüyor.
-        </p>
+        <h3 className="text-xl font-bold">Rapor Özeti</h3>
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full min-w-[700px] text-left">
+            <thead>
+              <tr className="border-b text-sm text-slate-500">
+                <th className="py-3">Kalem</th>
+                <th>Tutar</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b"><td className="py-4">Satış Toplamı</td><td>{money(totalSales)}</td></tr>
+              <tr className="border-b"><td className="py-4">Satış Kârı</td><td>{money(totalProfit)}</td></tr>
+              <tr className="border-b"><td className="py-4">Gider</td><td>{money(totalExpenses)}</td></tr>
+              <tr className="border-b"><td className="py-4 font-bold">Net</td><td className="font-bold">{money(net)}</td></tr>
+              <tr className="border-b"><td className="py-4">Alış Toplamı</td><td>{moneyUSD(totalPurchases)}</td></tr>
+              <tr className="border-b"><td className="py-4">Firma Borç Ödeme</td><td>{moneyUSD(totalDebtPaid)}</td></tr>
+              <tr className="border-b"><td className="py-4">Veresiye Tahsilat</td><td>{money(totalCreditPaid)}</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
 }
-
 
 function BarcodeInput({ label, value, onChange, onSubmit }) {
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -2766,6 +2860,118 @@ function ReceiptButton({ sale }) {
       className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-bold text-white hover:bg-slate-800"
     >
       Fiş
+    </button>
+  );
+}
+
+
+function CorporateReportButton({ title, rows, columns, summary = [], filename = "rapor" }) {
+  const openReport = () => {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    const safeColumns = Array.isArray(columns) ? columns : [];
+
+    const bodyRows = safeRows
+      .map((row) => {
+        const cells = safeColumns
+          .map(([label, getter]) => {
+            const value = typeof getter === "function" ? getter(row) : row?.[getter];
+            return `<td>${value ?? ""}</td>`;
+          })
+          .join("");
+        return `<tr>${cells}</tr>`;
+      })
+      .join("");
+
+    const headCells = safeColumns.map(([label]) => `<th>${label}</th>`).join("");
+
+    const summaryHtml = summary
+      .map((item) => `
+        <div class="summaryCard">
+          <div class="summaryLabel">${item.label}</div>
+          <div class="summaryValue">${item.value}</div>
+        </div>
+      `)
+      .join("");
+
+    const html = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>${title}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; background: white; }
+            .top { display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 2px solid #0f172a; padding-bottom: 16px; }
+            .brand { display: flex; align-items: center; gap: 14px; }
+            .logo { width: 58px; height: 58px; border-radius: 16px; background: #0f172a; color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 22px; }
+            h1 { margin: 0; font-size: 24px; }
+            .muted { color: #64748b; font-size: 12px; line-height: 1.45; }
+            .reportTitle { margin-top: 22px; font-size: 22px; font-weight: 900; }
+            .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 18px 0; }
+            .summaryCard { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px; }
+            .summaryLabel { font-size: 12px; color: #64748b; }
+            .summaryValue { margin-top: 6px; font-size: 18px; font-weight: 900; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12px; }
+            th { text-align: left; background: #0f172a; color: white; padding: 10px; }
+            td { border-bottom: 1px solid #e5e7eb; padding: 9px; vertical-align: top; }
+            .footer { margin-top: 22px; text-align: center; color: #64748b; font-size: 12px; }
+            @media print {
+              body { padding: 12px; }
+              .noPrint { display: none; }
+              .summary { grid-template-columns: repeat(3, 1fr); }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="top">
+            <div class="brand">
+              <div class="logo">SAR</div>
+              <div>
+                <h1>SAR ELEKTRONİK</h1>
+                <div class="muted">CEP DÜNYASI</div>
+              </div>
+            </div>
+            <div class="muted" style="text-align:right">
+              Tel: 533 810 75 25<br />
+              Cumhuriyet, Kaleönü Cad No:36/B<br />
+              38040 Melikgazi / Kayseri
+            </div>
+          </div>
+
+          <div class="reportTitle">${title}</div>
+          <div class="muted">Rapor Tarihi: ${new Date().toLocaleDateString("tr-TR")}</div>
+
+          <div class="summary">${summaryHtml}</div>
+
+          <table>
+            <thead><tr>${headCells}</tr></thead>
+            <tbody>
+              ${bodyRows || `<tr><td colspan="${safeColumns.length}">Kayıt bulunamadı.</td></tr>`}
+            </tbody>
+          </table>
+
+          <div class="footer">Bu rapor Cep Dünyası yönetim sistemi üzerinden oluşturulmuştur.</div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    const win = window.open("", "_blank");
+    win.document.write(html);
+    win.document.close();
+  };
+
+  return (
+    <button
+      onClick={openReport}
+      className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800"
+    >
+      PDF Rapor
     </button>
   );
 }
