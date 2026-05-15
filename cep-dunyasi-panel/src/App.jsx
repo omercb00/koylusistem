@@ -49,7 +49,9 @@ const defaultProducts = [
 ];
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return !!localStorage.getItem("cepDunyasiCurrentUser");
+  });
   const [activePage, setActivePage] = useState(() => localStorage.getItem("cepDunyasiActivePage") || "dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(() => {
@@ -59,6 +61,12 @@ function App() {
       return null;
     }
   });
+  useEffect(() => {
+    if (currentUser && !isLoggedIn) {
+      setIsLoggedIn(true);
+    }
+  }, [currentUser, isLoggedIn]);
+
   const [cloudStatus, setCloudStatus] = useState("Bulut hazır");
   const [toast, setToast] = useState(null);
   const [usdRate, setUsdRate] = useState(0);
